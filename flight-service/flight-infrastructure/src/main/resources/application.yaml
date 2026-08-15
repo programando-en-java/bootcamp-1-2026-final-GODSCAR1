@@ -1,0 +1,33 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: flight-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/airline_flight
+    username: airline
+    password: airline
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks the mapping matches it.
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  threads:
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

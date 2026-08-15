@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.programandoenjava.airline</groupId>
+        <artifactId>flight-service</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>flight-infrastructure</artifactId>
+    <name>flight-infrastructure</name>
+    <description>Adapters, configuration and application entry point.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.programandoenjava.airline</groupId>
+            <artifactId>flight-application</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Boot 4 modularization: the Flyway starter, not flyway-core. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <!-- Postgres support ships separately from the starter. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Boot 4 modularization: @ServiceConnection support is explicit. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Testcontainers 2 renamed every module with a testcontainers- prefix,
+          so the old org.testcontainers:postgresql no longer exists and the Boot
+          BOM cannot resolve a version for it.
+
+          testcontainers-junit-jupiter is deliberately absent: the container is
+          declared as a @Bean with @ServiceConnection, so Spring owns its
+          lifecycle. That module is only needed for the @Testcontainers /
+          @Container JUnit extension, which this setup does not use.
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Architecture rules live here because this is the only module with all
+          three layers on its classpath. Placing them in flight-domain would let
+          ArchUnit see domain classes only, and any rule about adapters would
+          silently pass over an empty set.
+
+          junit6, not junit5: Spring Boot 4 mandates JUnit Jupiter 6, and the
+          wrong artifact contributes a TestEngine that never picks the rules up.
+          Not managed by the Boot BOM, so the version is explicit.
+        -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit6</artifactId>
+            <version>1.5.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Only this module is repackaged into an executable jar. Declaring
+              the plugin in flight-domain or flight-application would turn their
+              jars into fat jars and break them as dependencies.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
