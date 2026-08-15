@@ -1,0 +1,27 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse / VS Code / NetBeans
+.classpath
+.project
+.settings/
+.vscode/
+/nbproject/private/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and local env
+*.log
+.env
+.env.local
