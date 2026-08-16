@@ -43,9 +43,8 @@ class HexagonalArchitectureTest {
                     "jakarta.persistence..",
                     "jakarta.validation..",
                     "org.hibernate..",
-                    "com.fasterxml.jackson..")
-            .as("flight-domain must not depend on any framework")
-            .allowEmptyShould(true); // TODO remove once flight-domain has classes
+                    "tools.jackson..")
+            .as("flight-domain must not depend on any framework");
 
     @ArchTest
     static final ArchRule applicationIsFrameworkFree = noClasses()
@@ -54,20 +53,17 @@ class HexagonalArchitectureTest {
                     "org.springframework..",
                     "jakarta.persistence..",
                     "org.hibernate..")
-            .as("flight-application must not depend on Spring or the persistence provider")
-            .allowEmptyShould(true); // TODO remove once flight-application has classes
+            .as("flight-application must not depend on Spring or the persistence provider");
 
     @ArchTest
     static final ArchRule inboundAdaptersMustNotReachOutboundAdapters = noClasses()
             .that().resideInAPackage(INBOUND_ADAPTERS)
             .should().dependOnClassesThat().resideInAPackage(OUTBOUND_ADAPTERS)
-            .as("inbound adapters must go through a use case, never straight to an outbound adapter")
-            .allowEmptyShould(true); // TODO remove once the first web adapter exists
+            .as("inbound adapters must go through a use case, never straight to an outbound adapter");
 
     @ArchTest
     static final ArchRule jpaEntitiesStayInsideThePersistenceAdapter = noClasses()
             .that().resideOutsideOfPackage(PERSISTENCE_ADAPTER)
             .should().dependOnClassesThat().areAnnotatedWith("jakarta.persistence.Entity")
-            .as("JPA entities must not escape the persistence adapter")
-            .allowEmptyShould(true); // TODO remove once the first entity exists
+            .as("JPA entities must not escape the persistence adapter");
 }

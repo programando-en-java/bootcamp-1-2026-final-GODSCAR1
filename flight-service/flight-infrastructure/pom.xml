@@ -58,6 +58,27 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Boot 4 modularization: MockMvc support ships separately from
+          spring-boot-starter-test. Without it @AutoConfigureMockMvc and the
+          org.springframework.boot.webmvc.test.autoconfigure package are not on
+          the classpath.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Same reason: @AutoConfigureDataJpa and @AutoConfigureTestEntityManager,
+          which EnableDatabaseTest relies on to build a slice with a real
+          database behind it.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Boot 4 modularization: @ServiceConnection support is explicit. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -68,11 +89,6 @@
           Testcontainers 2 renamed every module with a testcontainers- prefix,
           so the old org.testcontainers:postgresql no longer exists and the Boot
           BOM cannot resolve a version for it.
-
-          testcontainers-junit-jupiter is deliberately absent: the container is
-          declared as a @Bean with @ServiceConnection, so Spring owns its
-          lifecycle. That module is only needed for the @Testcontainers /
-          @Container JUnit extension, which this setup does not use.
         -->
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -85,10 +101,6 @@
           three layers on its classpath. Placing them in flight-domain would let
           ArchUnit see domain classes only, and any rule about adapters would
           silently pass over an empty set.
-
-          junit6, not junit5: Spring Boot 4 mandates JUnit Jupiter 6, and the
-          wrong artifact contributes a TestEngine that never picks the rules up.
-          Not managed by the Boot BOM, so the version is explicit.
         -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
@@ -108,6 +120,34 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!--
+              Generates the static JPA metamodel (FlightEntity_), which replaces
+              string literals inside Specifications: a renamed attribute fails
+              to compile, and root.get returns a typed Path instead of
+              Path<Object>.
+
+              Declared as an annotation processor path rather than a provided
+              dependency. That keeps it off the compile classpath, where its own
+              transitive dependencies collide with the application's and produce
+              a NoClassDefFoundError for JAXBException.
+
+              hibernate-processor, not hibernate-jpamodelgen: Hibernate 7 renamed
+              the artifact, and the old coordinates only resolve by relocation.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.hibernate.orm</groupId>
+                            <artifactId>hibernate-processor</artifactId>
+                            <version>${hibernate.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
         </plugins>
     </build>
