@@ -1,4 +1,65 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 
-public class SearchFlightsRequestMapper {
+import com.programandoenjava.airline.flight.application.port.in.PageQuery;
+import com.programandoenjava.airline.flight.application.port.in.SearchFlightsQuery;
+import com.programandoenjava.airline.flight.application.port.in.SortableField;
+import com.programandoenjava.airline.flight.domain.AirportCode;
+import com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto.SearchFlightsRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import java.util.List;
+import java.util.Locale;
+
+final class SearchFlightsRequestMapper {
+
+    private SearchFlightsRequestMapper() {
+    }
+
+    static SearchFlightsQuery toQuery(SearchFlightsRequest request, Pageable pageable) {
+        PageQuery page = new PageQuery(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                toSortOrders(pageable.getSort()));
+
+        return new SearchFlightsQuery(
+                toAirportCode(request.origin()),
+                toAirportCode(request.destination()),
+                request.date(),
+                page);
+    }
+
+    /** A missing filter is null, not an empty AirportCode. */
+    private static AirportCode toAirportCode(String value) {
+        return value == null || value.isBlank() ? null : new AirportCode(value);
+    }
+
+    private static List<PageQuery.SortOrder> toSortOrders(Sort sort) {
+        return sort.stream().map(SearchFlightsRequestMapper::toSortOrder).toList();
+    }
+
+    private static PageQuery.SortOrder toSortOrder(Sort.Order order) {
+        SortableField field = toField(order.getProperty());
+        PageQuery.Direction direction = order.isAscending()
+                ? PageQuery.Direction.ASC
+                : PageQuery.Direction.DESC;
+
+        return new PageQuery.SortOrder(field, direction);
+    }
+
+    private static SortableField toField(String raw) {
+        String normalised = camelToUpperSnake(raw.trim());
+        try {
+            return SortableField.valueOf(normalised);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "Unknown sort field: " + raw
+                            + ". Allowed: departureTime, arrivalTime, price");
+        }
+    }
+
+    /** departureTime becomes DEPARTURE_TIME, so the enum can stay in Java style. */
+    private static String camelToUpperSnake(String value) {
+        return value.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase(Locale.ROOT);
+    }
 }

@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Clock;
 
 @Configuration
-class FlightConfiguration {
+public class ApplicationConfiguration {
 
     @Bean
     Clock clock() {
