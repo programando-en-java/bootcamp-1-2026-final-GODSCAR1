@@ -14,6 +14,8 @@
 
     <modules>
         <module>flight-service</module>
+        <module>booking-service</module>
+        <module>e2e-tests</module>
     </modules>
 
 </project>

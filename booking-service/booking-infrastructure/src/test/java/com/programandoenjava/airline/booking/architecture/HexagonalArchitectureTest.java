@@ -1,0 +1,89 @@
+package com.programandoenjava.airline.booking.architecture;
+
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.Architectures;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+
+/**
+ * Architecture rules for booking-service.
+ *
+ * <p>Duplicated from flight-service rather than shared (ADR-003), and not
+ * identical: this service talks to another over HTTP, so it has a rule
+ * flight-service has no use for.
+ */
+@AnalyzeClasses(
+        packages = "com.programandoenjava.airline.booking",
+        importOptions = ImportOption.DoNotIncludeTests.class)
+class HexagonalArchitectureTest {
+
+    private static final String DOMAIN = "..booking.domain..";
+    private static final String APPLICATION = "..booking.application..";
+    private static final String INFRASTRUCTURE = "..booking.infrastructure..";
+
+    private static final String INBOUND_ADAPTERS = "..infrastructure.adapter.in..";
+    private static final String OUTBOUND_ADAPTERS = "..infrastructure.adapter.out..";
+    private static final String PERSISTENCE_ADAPTER = "..infrastructure.adapter.out.persistence..";
+
+    @ArchTest
+    static final ArchRule layersPointInwardsOnly = Architectures.layeredArchitecture()
+            .consideringOnlyDependenciesInLayers()
+            .optionalLayer("Domain").definedBy(DOMAIN)
+            .optionalLayer("Application").definedBy(APPLICATION)
+            .optionalLayer("Infrastructure").definedBy(INFRASTRUCTURE)
+            .whereLayer("Infrastructure").mayNotBeAccessedByAnyLayer()
+            .whereLayer("Application").mayOnlyBeAccessedByLayers("Infrastructure")
+            .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Infrastructure")
+            .as("layers may only point inwards: infrastructure to application to domain");
+
+    @ArchTest
+    static final ArchRule domainIsFrameworkFree = noClasses()
+            .that().resideInAPackage(DOMAIN)
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework..",
+                    "jakarta.persistence..",
+                    "jakarta.validation..",
+                    "org.hibernate..",
+                    "tools.jackson..")
+            .as("booking-domain must not depend on any framework");
+
+    @ArchTest
+    static final ArchRule applicationIsFrameworkFree = noClasses()
+            .that().resideInAPackage(APPLICATION)
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework..",
+                    "jakarta.persistence..",
+                    "org.hibernate..")
+            .as("booking-application must not depend on Spring or the persistence provider");
+
+    /**
+     * The rule flight-service does not need. A @FeignClient in the application
+     * layer would compile and work, and would make the use case depend on how
+     * the other service is reached rather than on what it is asked for.
+     * Resilience4j is banned for the same reason: retries and circuit breakers
+     * are properties of a network call, not of a use case.
+     */
+    @ArchTest
+    static final ArchRule theCallToFlightServiceStaysInTheAdapter = noClasses()
+            .that().resideInAnyPackage(DOMAIN, APPLICATION)
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "feign..",
+                    "org.springframework.cloud..",
+                    "io.github.resilience4j..")
+            .as("Feign and Resilience4j belong to the outbound adapter, not to a use case");
+
+    @ArchTest
+    static final ArchRule inboundAdaptersMustNotReachOutboundAdapters = noClasses()
+            .that().resideInAPackage(INBOUND_ADAPTERS)
+            .should().dependOnClassesThat().resideInAPackage(OUTBOUND_ADAPTERS)
+            .as("inbound adapters must go through a use case, never straight to an outbound adapter");
+
+    @ArchTest
+    static final ArchRule jpaEntitiesStayInsideThePersistenceAdapter = noClasses()
+            .that().resideOutsideOfPackage(PERSISTENCE_ADAPTER)
+            .should().dependOnClassesThat().areAnnotatedWith("jakarta.persistence.Entity")
+            .as("JPA entities must not escape the persistence adapter");
+}
