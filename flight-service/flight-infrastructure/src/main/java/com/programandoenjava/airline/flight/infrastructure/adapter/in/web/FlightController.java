@@ -2,6 +2,7 @@ package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsCommand;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsUseCase;
+import com.programandoenjava.airline.flight.application.port.in.blockseats.SeatsHeld;
 import com.programandoenjava.airline.flight.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.flight.application.port.shared.PageQuery;
 import com.programandoenjava.airline.flight.application.port.shared.PageResult;
@@ -10,7 +11,6 @@ import com.programandoenjava.airline.flight.application.port.in.searchflights.Se
 import com.programandoenjava.airline.flight.domain.flight.Flight;
 import com.programandoenjava.airline.flight.domain.flight.FlightId;
 import com.programandoenjava.airline.flight.domain.seatblock.BookingId;
-import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
 import com.programandoenjava.airline.flight.domain.seatblock.SeatCount;
 import com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto.BlockSeatsRequest;
 import com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto.FlightResponse;
@@ -73,8 +73,8 @@ class FlightController {
         BlockSeatsCommand command =
                 BlockSeatsRequestMapper.toCommand(flightId, idempotencyKey, request);
 
-        SeatBlock block = blockSeatsUseCase.block(command);
+        SeatsHeld held = blockSeatsUseCase.block(command);
 
-        return SeatBlockResponse.from(block);
+        return SeatBlockResponse.from(held);
     }
 }
