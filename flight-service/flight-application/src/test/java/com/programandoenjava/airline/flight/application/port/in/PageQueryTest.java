@@ -1,5 +1,7 @@
 package com.programandoenjava.airline.flight.application.port.in;
 
+import com.programandoenjava.airline.flight.application.port.shared.PageQuery;
+import com.programandoenjava.airline.flight.application.port.shared.SortableField;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

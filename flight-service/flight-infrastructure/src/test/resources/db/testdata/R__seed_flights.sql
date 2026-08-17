@@ -1,3 +1,4 @@
+DELETE FROM seat_blocks;
 DELETE FROM flights;
 
 INSERT INTO flights (id, flight_number, origin, destination,

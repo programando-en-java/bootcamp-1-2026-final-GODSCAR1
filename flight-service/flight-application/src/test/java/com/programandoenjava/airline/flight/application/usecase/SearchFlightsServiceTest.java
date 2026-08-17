@@ -1,12 +1,13 @@
 package com.programandoenjava.airline.flight.application.usecase;
 
-import com.programandoenjava.airline.flight.application.port.in.PageQuery;
-import com.programandoenjava.airline.flight.application.port.in.PageResult;
-import com.programandoenjava.airline.flight.application.port.in.SearchFlightsQuery;
-import com.programandoenjava.airline.flight.application.port.in.SortableField;
-import com.programandoenjava.airline.flight.application.port.out.FlightSearchCriteria;
-import com.programandoenjava.airline.flight.application.port.out.LoadFlightsPort;
-import com.programandoenjava.airline.flight.domain.AirportCode;
+import com.programandoenjava.airline.flight.application.port.shared.PageQuery;
+import com.programandoenjava.airline.flight.application.port.shared.PageResult;
+import com.programandoenjava.airline.flight.application.port.in.searchflights.SearchFlightsQuery;
+import com.programandoenjava.airline.flight.application.port.shared.SortableField;
+import com.programandoenjava.airline.flight.application.port.out.searchflights.FlightSearchCriteria;
+import com.programandoenjava.airline.flight.application.port.out.searchflights.LoadFlightsPort;
+import com.programandoenjava.airline.flight.domain.shared.AirportCode;
+import com.programandoenjava.airline.flight.domain.flight.Flight;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,7 +53,7 @@ class SearchFlightsServiceTest {
     @BeforeEach
     void setUp() {
         service = new SearchFlightsService(loadFlightsPort, FIXED_CLOCK);
-        PageResult<com.programandoenjava.airline.flight.domain.Flight> emptyPage =
+        PageResult<Flight> emptyPage =
                 new PageResult<>(List.of(), 0, 20, 0);
         BDDMockito.given(loadFlightsPort.search(BDDMockito.any())).willReturn(emptyPage);
     }
@@ -122,7 +123,7 @@ class SearchFlightsServiceTest {
         return criteriaCaptor.getValue();
     }
 
-    private static SearchFlightsQuery searchWithDate(LocalDate date) {
+    private static SearchFlightsQuery searchWithDate(final LocalDate date) {
         PageQuery page = new PageQuery(0, 20, List.of(
                 new PageQuery.SortOrder(SortableField.DEPARTURE_TIME, PageQuery.Direction.ASC)));
         return new SearchFlightsQuery(BOG, MDE, date, page);
