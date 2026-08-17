@@ -8,7 +8,6 @@ import com.programandoenjava.airline.flight.domain.shared.Money;
 
 import java.time.Instant;
 
-@SuppressWarnings({"ALL", "LocalCanBeFinal"})
 public record Flight(FlightId id,
                      FlightNumber flightNumber,
                      AirportCode origin,
