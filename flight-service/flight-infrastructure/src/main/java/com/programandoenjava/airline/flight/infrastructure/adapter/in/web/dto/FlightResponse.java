@@ -1,6 +1,6 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto;
 
-import com.programandoenjava.airline.flight.domain.Flight;
+import com.programandoenjava.airline.flight.domain.flight.Flight;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -16,10 +16,10 @@ public record FlightResponse(UUID id,
                              BigDecimal price,
                              String currency) {
 
-    public static FlightResponse from(Flight flight) {
+    public static FlightResponse from(final Flight flight) {
         return new FlightResponse(
                 flight.id().value(),
-                flight.number().value(),
+                flight.flightNumber().value(),
                 flight.origin().value(),
                 flight.destination().value(),
                 flight.schedule().departure(),

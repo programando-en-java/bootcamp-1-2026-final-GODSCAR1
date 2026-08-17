@@ -1,6 +1,10 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 
-import com.programandoenjava.airline.flight.domain.DomainValidationException;
+import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.BookingAlreadyHoldsSeatsException;
+import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.FlightNotFoundException;
+import com.programandoenjava.airline.flight.domain.flight.exception.FlightDepartedException;
+import com.programandoenjava.airline.flight.domain.flight.exception.InsufficientSeatsException;
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -26,10 +30,10 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException exception,
-            HttpHeaders headers,
-            HttpStatusCode status,
-            WebRequest request) {
+            final MethodArgumentNotValidException exception,
+            final HttpHeaders headers,
+            final HttpStatusCode status,
+            final WebRequest request) {
 
         Map<String, String> errors = exception.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.toMap(
@@ -51,7 +55,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * three letters, a currency that does not exist.
      */
     @ExceptionHandler(DomainValidationException.class)
-    ProblemDetail onDomainValidation(DomainValidationException exception) {
+    ProblemDetail onDomainValidation(final DomainValidationException exception) {
         return badRequest("Invalid request", exception.getMessage());
     }
 
@@ -60,7 +64,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * shape of the expression; this is the whitelist.
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    ProblemDetail onIllegalArgument(IllegalArgumentException exception) {
+    ProblemDetail onIllegalArgument(final IllegalArgumentException exception) {
         return badRequest("Invalid request parameter", exception.getMessage());
     }
 
@@ -70,7 +74,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * names and class names have no business reaching a client.
      */
     @ExceptionHandler(Exception.class)
-    ProblemDetail onUnexpectedError(Exception exception) {
+    ProblemDetail onUnexpectedError(final Exception exception) {
         LOG.error("Unhandled exception", exception);
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -81,7 +85,58 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    private static ProblemDetail badRequest(String title, String detail) {
+    /**
+     * The flight exists but has gone. Nothing the caller changes about the
+     * request will make it succeed, which is what separates this from a
+     * conflict: 409 invites a retry, 422 does not.
+     */
+    @ExceptionHandler(FlightDepartedException.class)
+    ProblemDetail handleFlightDeparted(final FlightDepartedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
+        problem.setTitle("Flight is no longer bookable");
+        problem.setType(URI.create("urn:airline:problem:flight-departed"));
+        return problem;
+    }
+
+    /**
+     * The request was well formed and may succeed later, or for a smaller party.
+     * The message carries how many seats were left, which is the only thing that
+     * makes this answer actionable.
+     */
+    @ExceptionHandler(InsufficientSeatsException.class)
+    ProblemDetail handleInsufficientSeats(final InsufficientSeatsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Not enough seats");
+        problem.setType(URI.create("urn:airline:problem:insufficient-seats"));
+        return problem;
+    }
+
+    /**
+     * A booking asked for seats twice under two different keys. Refused rather
+     * than honoured: a booking holding two sets of seats is a booking holding
+     * seats nobody will pay for.
+     */
+    @ExceptionHandler(BookingAlreadyHoldsSeatsException.class)
+    ProblemDetail handleBookingAlreadyHoldsSeats(final BookingAlreadyHoldsSeatsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Booking already holds seats");
+        problem.setType(URI.create("urn:airline:problem:booking-already-held"));
+        return problem;
+    }
+
+    @ExceptionHandler(FlightNotFoundException.class)
+    ProblemDetail handleFlightNotFound(final FlightNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Flight not found");
+        problem.setType(URI.create("urn:airline:problem:flight-not-found"));
+        return problem;
+    }
+
+    private static ProblemDetail badRequest(final String title, final String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setTitle(title);
         problem.setType(URI.create("urn:airline:problem:validation"));

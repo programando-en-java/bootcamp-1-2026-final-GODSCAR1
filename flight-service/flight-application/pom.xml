@@ -14,6 +14,12 @@
     <description>Use cases and ports. Framework free.</description>
 
     <dependencies>
+        <!-- See flight-domain's pom for why this is provided in every module. -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.programandoenjava.airline</groupId>
             <artifactId>flight-domain</artifactId>

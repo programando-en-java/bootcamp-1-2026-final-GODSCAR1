@@ -14,6 +14,12 @@
     <description>Adapters, configuration and application entry point.</description>
 
     <dependencies>
+        <!-- See flight-domain's pom for why this is provided in every module. -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.programandoenjava.airline</groupId>
             <artifactId>flight-application</artifactId>
@@ -107,6 +113,16 @@
             <artifactId>archunit-junit6</artifactId>
             <version>1.5.0</version>
             <scope>test</scope>
+        </dependency>
+
+        <!--
+          Boot 4 renamed spring-boot-starter-aop to spring-boot-starter-aspectj.
+          Without it the @Aspect annotation does not resolve and @UnitOfWork
+          silently does nothing.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
     </dependencies>
 
