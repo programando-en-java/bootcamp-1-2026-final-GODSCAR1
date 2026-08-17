@@ -17,6 +17,8 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [008](#adr-008-seat-blocks-as-a-separate-aggregate) | Accepted | Seat blocks as a separate aggregate |
 | [009](#adr-009-transaction-boundaries-declared-with-an-annotation) | Accepted | Transaction boundaries declared with an annotation |
 | [010](#adr-010-testing-style) | Accepted | Testing style |
+| [011](#adr-011-idempotent-booking-creation) | Accepted | Idempotent booking creation |
+| [012](#adr-012-calling-flight-service) | Accepted | Calling flight-service |
 
 ---
 
@@ -129,9 +131,12 @@ in the outbox relay, partial indexes, and `JSONB`.
 
 ### Decision
 
-PostgreSQL everywhere. Local development runs a single Postgres container with
-one database per service; tests use Testcontainers. H2 is not a dependency of
-any module.
+PostgreSQL everywhere, and one instance per service rather than one instance
+carved into databases. Each service's compose entry brings up a container of its
+own, with its own volume, reachable only under its own network alias. Tests use
+Testcontainers, and the end-to-end module arranges the same shape.
+
+H2 is not a dependency of any module.
 
 Schema is managed by Flyway from the first migration, with
 `spring.jpa.hibernate.ddl-auto=validate`.
@@ -141,6 +146,12 @@ Schema is managed by Flyway from the first migration, with
 - Running tests requires a working Docker daemon, locally and in CI.
 - Tests are slower than they would be against an in-memory database.
 - The behaviour verified in tests is the behaviour shipped to production.
+- A service physically cannot read another's tables. Sharing an instance made
+  that a convention rather than a fact, and a convention is what a stray join
+  crosses on a Friday. The cost is one container per service on a laptop, and a
+  host port each so both stay reachable.
+- There is no longer a script carving databases out of one instance: each
+  container creates the one it needs through `POSTGRES_DB`.
 
 ---
 
@@ -643,6 +654,40 @@ them writes.
 from today. Relative dates would leave the test and the database each working out
 what "today" is — an agreement that holds for most of the day and not all of it.
 
+### End to end
+
+A fourth layer, above the slices: the two services in containers of their own,
+each with its own database, talking over a network. It is the only place the
+Feign error decoder runs, because every other test in the repository mocks the
+port it sits behind — and the only place the idempotency key is seen to travel
+as a header rather than assumed to.
+
+That distinction earned itself immediately. booking-service was answering 502
+where flight-service had said 422, because the decoder compared `HttpStatus`
+constants and Spring 7 deprecated `UNPROCESSABLE_ENTITY` in favour of
+`UNPROCESSABLE_CONTENT`, following the rename in RFC 9110. `resolve()` returns
+the new constant, the branch never matched, and every other test passed. The fix
+is to compare the number, which does not get renamed; the general lesson is that
+a status crossing a service boundary is a number, and comparing it as anything
+else couples two services to a constant name neither of them owns.
+
+**The stack starts itself**, building images from the same Dockerfiles the
+compose file uses, so what is exercised is what would be deployed. The
+alternative — running both applications in one JVM — would have been faster to
+write and would have put every service's dependencies on one classpath, which is
+a montage that exists nowhere else and fails in ways that teach nothing.
+
+**They are skipped unless asked for.** Two images and four containers cost about
+a minute, and a suite people run every few minutes is worth more than one that
+covers a little extra. `-Dairline.e2e=true` is what turns them on, and CI is
+where they always run.
+
+**The tests insert the flights they need.** There is no API for creating one, and
+the seed the slices use lives in test resources, so a running instance starts
+with an empty catalogue. Each test makes its own with a fresh id rather than
+sharing a fixture, because a fixture shared across a network is a fixture nobody
+can reset.
+
 ### Consequences
 
 - The fixed instant lives in three files: the seed and both slices. Changing one
@@ -656,4 +701,156 @@ what "today" is — an agreement that holds for most of the day and not all of i
   controller's annotations. That duplication is the point: a test that sourced
   the path from the code under test would stay green while the route changed
   under every client.
+- The end-to-end tests need a `package` before they run, because the Dockerfiles
+  copy a jar Maven has already built. Nothing checks that, so a stale jar is
+  tested silently.
 - None of this is enforced. It is a convention, and review is what applies it.
+
+---
+
+## ADR-011: Idempotent booking creation
+
+**Status:** Accepted
+
+### Context
+
+`POST /bookings` takes seats off a flight and writes a row. A passenger who
+double-clicks, or a client that retries a request whose response was lost, must
+not end up with two bookings — and worse, must not leave a second set of seats
+held that nobody will pay for.
+
+flight-service solved the same problem with a lookup taken under a pessimistic
+lock on the flight row (ADR-007). That approach does not transfer: the row a
+booking would lock is the one it is trying to create, so there is nothing to
+lock before the decision.
+
+### What the full pattern looks like
+
+The industry answer, which Stripe popularised, is a table of keys separate from
+the resource:
+
+- A row is inserted for the key **before any work starts**, marked in progress.
+  That insert is what wins or loses the race.
+- The response is stored on the row when the work completes, and a retry is
+  answered with those same bytes — status code included — rather than by
+  rebuilding it from the aggregate.
+- A caller that loses the race while the winner is still working is told so, and
+  retries rather than being handed a half-finished result.
+- Keys expire, typically after a day, or the table grows without bound and a key
+  from last year blocks a legitimate booking that happens to reuse it.
+
+### Decision
+
+Not that. Three narrower mechanisms, of which only the last is a guarantee:
+
+**A lookup by key** before anything else, which answers the ordinary case — a
+retry seconds later — without troubling flight-service.
+
+**The key forwarded to flight-service as its own key**, alongside a booking id
+that stays random. Their contract keeps the two apart — the id answers "has this
+booking already taken seats", the key answers "have I already served this
+request" — and passing ours through means a race that gets past the lookup is
+one request in their eyes too. No second set of seats is held.
+
+Deriving the booking id from the key would have achieved the same and made an
+ordinary `save` idempotent as well. It was rejected because a resource id is
+opaque everywhere else: it reaches URLs, emails and eventually a passenger, and
+one derivable from another value ties two systems together by a relationship
+nobody declared. It would also mean that reusing a key after an expiry — which
+this design will need — produced a booking wearing the old one's id.
+
+**A unique index on the key**, and a `saveIfNew` built on
+`INSERT ... ON CONFLICT DO NOTHING`. The check and the write are one statement,
+so there is no window between the question and the answer — which matters
+because there is no row to lock beforehand: the row is what the two requests are
+competing to create.
+
+The cost is a native query with twelve parameters where a `save` would have taken
+an object. The alternative, catching the constraint violation, needs a flush and
+a fresh transaction to read afterwards, because Postgres aborts the current one
+on a violation.
+
+### Consequences
+
+- Two simultaneous requests both do the work; the loser discards it and returns
+  the winner's booking. The full pattern would have the loser wait or be told to
+  retry. Accepted: the work is one HTTP call that flight-service answers
+  idempotently, so repeating it costs latency and nothing else.
+- The response is rebuilt from the stored booking rather than replayed. Identical
+  today because nothing in the response varies; it would stop being identical if
+  the response ever carried something the aggregate does not hold.
+- **Keys are never purged.** The column grows with the table, and a key reused
+  after any length of time returns the original booking. A retention job is the
+  missing piece, and is the first thing to add if this ever runs for real.
+- Reusing a key with a different body returns the original booking rather than
+  reporting the mismatch. Detecting it would mean storing a hash of the request
+  and comparing, which is machinery for a case only a misbehaving client can
+  reach.
+- The insert is the one statement in this service written as native SQL. Every
+  other query is JPA, and the comment on `insertIfAbsent` is what stops someone
+  tidying it into a `save`.
+
+---
+
+## ADR-012: Calling flight-service
+
+**Status:** Accepted
+
+### Context
+
+Creating a booking means asking flight-service for seats over HTTP (ADR-004).
+Three things follow from that call being synchronous and across a network: what
+happens to its errors, what happens when it is slow or absent, and where the
+transaction boundary sits.
+
+### Decision
+
+**Errors are translated by an `ErrorDecoder`,** not caught around the call site.
+Feign raises `FeignException.Conflict` for a 409 and `FeignException` for
+everything else; neither means anything to a use case. The decoder is where
+Feign expects that translation to live, and putting it there keeps the adapter a
+single line of delegation.
+
+Refusals are forwarded with the status flight-service chose, because it is the
+service that knows why. A 409 means the seats are gone and a 422 means the
+flight has, and rewriting either into a generic 502 would tell the passenger
+less than the truth. What is not forwarded is flight-service's `detail` text
+verbatim: it names a flight by an id the passenger never supplied, so
+booking-service phrases its own.
+
+**Retries cover technical failures only.** A 409 will not become a 201 by asking
+again — the seats are sold — and a 422 will not either, since the flight has
+departed. Retrying them would spend three attempts and three times the latency
+to arrive at the same refusal, and would make a busy flight look like an outage.
+Resilience4j is configured to ignore those two and retry connection failures,
+timeouts and 5xx.
+
+**The circuit breaker is on the client, and its open state is a failure, not a
+fallback.** There is no sensible booking to make without seats, so a fallback
+that returned one would be inventing a reservation. When the breaker opens,
+booking-service says it cannot serve the request.
+
+**No transaction spans the call.** `CreateBookingService` carries no
+`@UnitOfWork`, unlike its counterpart in flight-service: the only local write is
+the final save, and holding a connection open across an HTTP round trip is how a
+slow dependency becomes an exhausted pool.
+
+**Persistence is JPA, except for the insert.** `saveIfNew` needs
+`INSERT ... ON CONFLICT DO NOTHING`, which JPQL cannot express, so that one
+statement is native inside the repository. The rest stays mapped, because the
+stories after this one — listing a passenger's bookings, moving one to paid —
+are ordinary queries and JPA is what flight-service already uses.
+
+### Consequences
+
+- `BlockSeatsRequest` and `SeatBlockResponse` are declared again in
+  booking-service. They mirror flight-service's DTOs field for field and are not
+  shared (ADR-003), so the two can drift silently. Contract testing is the
+  intended mitigation and does not exist yet.
+- The Feign adapter and its `ErrorDecoder` are the one piece of this service
+  without a test. Covering them properly means either WireMock or a running
+  flight-service; the decision was to leave them until an end-to-end test exists,
+  and this is the note that says so.
+- A booking whose seats were held but whose save then failed leaves a hold in
+  flight-service that nobody will claim. Nothing releases it today. The expiry
+  sweep that ADR-008 anticipates is what would, and it arrives with payment.
