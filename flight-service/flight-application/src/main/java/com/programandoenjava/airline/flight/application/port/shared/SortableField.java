@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.application.port.in;
+package com.programandoenjava.airline.flight.application.port.in.shared;
 
 public enum SortableField {
 

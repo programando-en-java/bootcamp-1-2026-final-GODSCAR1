@@ -44,7 +44,7 @@ public record Flight(FlightId id,
     /**
      * Returns this flight with the given seats blocked.
      */
-    public Flight blockSeats(int count) {
+    private Flight blockSeats(int count) {
         SeatInventory blocked = seats.block(count);
         return new Flight(id, number, origin, destination, schedule, blocked, price);
     }
@@ -52,5 +52,16 @@ public record Flight(FlightId id,
     public Flight releaseSeats(int count) {
         SeatInventory released = seats.release(count);
         return new Flight(id, number, origin, destination, schedule, released, price);
+    }
+
+    public BlockResult block(BookingId bookingId, SeatCount requested, Instant now) {
+        if (!schedule.departsAfter(now)) {
+            throw new DomainValidationException(
+                    "Flight " + number.value() + " is no longer open for booking");
+        }
+        Flight reduced = blockSeats(requested.value());
+        SeatBlock block = new SeatBlock(
+                SeatBlockId.newId(), id, bookingId, requested, now);
+        return new BlockResult(reduced, block);
     }
 }

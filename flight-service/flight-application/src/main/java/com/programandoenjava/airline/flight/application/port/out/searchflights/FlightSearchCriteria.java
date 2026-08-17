@@ -1,7 +1,7 @@
 package com.programandoenjava.airline.flight.application.port.out;
 
-import com.programandoenjava.airline.flight.application.port.in.PageQuery;
-import com.programandoenjava.airline.flight.domain.AirportCode;
+import com.programandoenjava.airline.flight.application.port.in.shared.PageQuery;
+import com.programandoenjava.airline.flight.domain.shared.AirportCode;
 
 import java.time.Instant;
 import java.util.List;

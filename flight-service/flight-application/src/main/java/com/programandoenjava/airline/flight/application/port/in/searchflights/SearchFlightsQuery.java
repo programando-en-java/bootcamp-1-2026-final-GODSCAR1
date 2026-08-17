@@ -1,6 +1,6 @@
 package com.programandoenjava.airline.flight.application.port.in;
 
-import com.programandoenjava.airline.flight.domain.AirportCode;
+import com.programandoenjava.airline.flight.domain.shared.AirportCode;
 
 import java.time.LocalDate;
 import java.util.Objects;
