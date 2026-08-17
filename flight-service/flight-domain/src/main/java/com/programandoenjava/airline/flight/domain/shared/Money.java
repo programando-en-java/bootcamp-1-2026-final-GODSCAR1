@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.shared;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,26 +18,26 @@ public record Money(BigDecimal amount, Currency currency) {
         }
         try {
             amount = amount.setScale(currency.getDefaultFractionDigits(), RoundingMode.UNNECESSARY);
-        } catch (ArithmeticException exception) {
+        } catch (final ArithmeticException exception) {
             throw new DomainValidationException(
                     "Amount " + amount + " has more precision than " + currency + " allows");
         }
     }
 
-    public static Money of(String amount, String currencyCode) {
+    public static Money of(final String amount, final String currencyCode) {
         return new Money(new BigDecimal(amount), Currency.getInstance(currencyCode));
     }
 
-    public Money plus(Money other) {
+    public Money plus(final Money other) {
         requireSameCurrency(other);
         return new Money(amount.add(other.amount), currency);
     }
 
-    public Money times(int factor) {
+    public Money times(final int factor) {
         return new Money(amount.multiply(BigDecimal.valueOf(factor)), currency);
     }
 
-    private void requireSameCurrency(Money other) {
+    private void requireSameCurrency(final Money other) {
         if (!currency.equals(other.currency)) {
             throw new DomainValidationException(
                     "Cannot operate on " + currency + " and " + other.currency);

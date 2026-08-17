@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.application.port.in.shared;
+package com.programandoenjava.airline.flight.application.port.shared;
 
 public record IdempotencyKey(String value) {
 

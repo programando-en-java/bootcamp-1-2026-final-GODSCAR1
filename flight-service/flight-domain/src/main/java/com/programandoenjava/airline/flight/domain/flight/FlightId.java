@@ -1,4 +1,6 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.flight;
+
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 
 import java.util.UUID;
 

@@ -1,7 +1,6 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.seatblock;
 
 import com.programandoenjava.airline.flight.domain.flight.Flight;
-import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
 
-public record BlockResult(Flight flight, SeatBlock block) {
+public record SeatsBlocked(Flight flight, SeatBlock block) {
 }

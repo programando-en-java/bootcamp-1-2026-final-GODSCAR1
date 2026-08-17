@@ -1,5 +1,7 @@
 package com.programandoenjava.airline.flight.domain;
 
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
+import com.programandoenjava.airline.flight.domain.shared.Money;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

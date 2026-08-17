@@ -1,6 +1,6 @@
-package com.programandoenjava.airline.flight.application.port.out;
+package com.programandoenjava.airline.flight.application.port.out.searchflights;
 
-import com.programandoenjava.airline.flight.application.port.in.shared.PageResult;
+import com.programandoenjava.airline.flight.application.port.shared.PageResult;
 import com.programandoenjava.airline.flight.domain.flight.Flight;
 
 public interface LoadFlightsPort {

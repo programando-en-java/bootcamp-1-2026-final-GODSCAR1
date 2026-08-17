@@ -14,6 +14,22 @@
     <description>Pure domain model. No framework dependencies.</description>
 
     <dependencies>
+        <!--
+          Annotations only, with CLASS retention: nothing loads JSpecify at
+          runtime and the compiled class is byte-identical with or without it.
+          It describes code rather than generating it, which is what keeps it on
+          the right side of ADR-006's framework-free rule.
+
+          provided rather than compile, because it is needed to build and never
+          to run. provided is not transitive, so all three modules declare it —
+          removing it from one on the grounds that a dependency already brings
+          it in will break that module's build.
+        -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

@@ -5,7 +5,7 @@ import com.programandoenjava.airline.flight.domain.flight.FlightId;
 
 import java.util.Optional;
 
-public interface LoadFlightPort {
+public interface LockFlightPort {
 
     Optional<Flight> byIdForUpdate(FlightId id);
 }

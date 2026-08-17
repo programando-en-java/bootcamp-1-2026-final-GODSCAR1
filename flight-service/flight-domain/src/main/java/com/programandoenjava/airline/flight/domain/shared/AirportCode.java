@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.shared;
 
 import java.util.Locale;
 import java.util.regex.Pattern;

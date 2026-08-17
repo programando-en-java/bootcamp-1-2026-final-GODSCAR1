@@ -1,6 +1,8 @@
 package com.programandoenjava.airline.flight.domain;
 
 
+import com.programandoenjava.airline.flight.domain.flight.SeatInventory;
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,7 +40,7 @@ class SeatInventoryTest {
         }
 
         @Test
-        @DisplayName("should reject a negative number of available seats")
+        @DisplayName("should reject a negative flightNumber of available seats")
         void shouldRejectANegativeNumberOfAvailableSeats() {
             Assertions.assertThatThrownBy(() -> new SeatInventory(120, -1))
                     .isInstanceOf(DomainValidationException.class);

@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.application.port.in.shared;
+package com.programandoenjava.airline.flight.application.port.shared;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ public record PageQuery(int page, int size, List<SortOrder> sort) {
         sort = List.copyOf(sort);
     }
 
-    public static PageQuery of(int page, int size) {
+    public static PageQuery of(final int page, final int size) {
         return new PageQuery(page, size, List.of());
     }
 

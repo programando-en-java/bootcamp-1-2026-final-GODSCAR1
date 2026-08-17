@@ -1,4 +1,6 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.flight;
+
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -14,7 +16,7 @@ public record FlightSchedule(Instant departure, Instant arrival) {
         }
     }
 
-    public boolean departsAfter(Instant instant) {
+    public boolean departsAfter(final Instant instant) {
         return departure.isAfter(instant);
     }
 

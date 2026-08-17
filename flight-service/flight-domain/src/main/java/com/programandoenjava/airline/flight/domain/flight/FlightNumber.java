@@ -1,4 +1,6 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.flight;
+
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -9,12 +11,12 @@ public record FlightNumber(String value) {
 
     public FlightNumber {
         if (value == null || value.isBlank()) {
-            throw new DomainValidationException("Flight number is required");
+            throw new DomainValidationException("Flight flightNumber is required");
         }
         String normalised = value.trim();
         if (!DESIGNATOR.matcher(normalised).matches()) {
             throw new DomainValidationException(
-                    "Flight number must be an IATA designator, was: " + value);
+                    "Flight flightNumber must be an IATA designator, was: " + value);
         }
         value = normalised.toUpperCase(Locale.ROOT);
     }

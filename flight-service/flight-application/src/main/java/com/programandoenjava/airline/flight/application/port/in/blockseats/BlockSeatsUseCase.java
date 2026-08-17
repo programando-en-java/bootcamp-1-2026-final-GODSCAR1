@@ -1,4 +1,4 @@
-package com.programandoenjava.airline.flight.application.blockseats;
+package com.programandoenjava.airline.flight.application.port.in.blockseats;
 
 import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
 

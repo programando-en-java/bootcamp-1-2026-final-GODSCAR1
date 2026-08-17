@@ -1,9 +1,14 @@
 package com.programandoenjava.airline.flight.application.usecase;
 
-import com.programandoenjava.airline.flight.application.port.in.*;
-import com.programandoenjava.airline.flight.application.port.out.FlightSearchCriteria;
-import com.programandoenjava.airline.flight.application.port.out.LoadFlightsPort;
-import com.programandoenjava.airline.flight.domain.Flight;
+import com.programandoenjava.airline.flight.application.port.in.searchflights.SearchFlightsQuery;
+import com.programandoenjava.airline.flight.application.port.in.searchflights.SearchFlightsUseCase;
+import com.programandoenjava.airline.flight.application.port.shared.PageQuery;
+import com.programandoenjava.airline.flight.application.port.shared.PageResult;
+import com.programandoenjava.airline.flight.application.port.shared.SortableField;
+import com.programandoenjava.airline.flight.application.port.out.searchflights.FlightSearchCriteria;
+import com.programandoenjava.airline.flight.application.port.out.searchflights.LoadFlightsPort;
+import com.programandoenjava.airline.flight.domain.flight.Flight;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -19,13 +24,13 @@ public class SearchFlightsService implements SearchFlightsUseCase {
     private final LoadFlightsPort loadFlightsPort;
     private final Clock clock;
 
-    public SearchFlightsService(LoadFlightsPort loadFlightsPort, Clock clock) {
+    public SearchFlightsService(final LoadFlightsPort loadFlightsPort, final Clock clock) {
         this.loadFlightsPort = loadFlightsPort;
         this.clock = clock;
     }
 
     @Override
-    public PageResult<Flight> search(SearchFlightsQuery query) {
+    public PageResult<Flight> search(final SearchFlightsQuery query) {
         Instant now = clock.instant();
         LocalDate departureDate = query.departureDate();
 
@@ -52,7 +57,7 @@ public class SearchFlightsService implements SearchFlightsUseCase {
      * never earlier than now: asking for today must not return this morning's
      * departures. That clamp is where the two acceptance criteria meet.
      */
-    private Instant lowerBound(LocalDate date, Instant now) {
+    private Instant lowerBound(@Nullable final LocalDate date, final Instant now) {
         if (date == null) {
             return now;
         }
@@ -60,7 +65,7 @@ public class SearchFlightsService implements SearchFlightsUseCase {
         return startOfDay.isAfter(now) ? startOfDay : now;
     }
 
-    private Instant upperBound(LocalDate date) {
+    private @Nullable Instant upperBound(@Nullable final LocalDate date) {
         return date == null ? null : date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 }

@@ -1,4 +1,6 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.seatblock;
+
+import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 
 public record SeatCount(int value) {
 

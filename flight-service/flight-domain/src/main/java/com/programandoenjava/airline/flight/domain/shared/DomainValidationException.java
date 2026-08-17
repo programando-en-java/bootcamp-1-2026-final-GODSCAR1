@@ -1,8 +1,8 @@
-package com.programandoenjava.airline.flight.domain;
+package com.programandoenjava.airline.flight.domain.shared;
 
 public class DomainValidationException extends RuntimeException {
 
-    public DomainValidationException(String message) {
+    public DomainValidationException(final String message) {
         super(message);
     }
 }
