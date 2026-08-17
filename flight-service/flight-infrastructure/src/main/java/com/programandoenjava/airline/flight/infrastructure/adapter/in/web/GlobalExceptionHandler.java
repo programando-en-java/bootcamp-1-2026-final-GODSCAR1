@@ -93,7 +93,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(FlightDepartedException.class)
     ProblemDetail handleFlightDeparted(final FlightDepartedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
+                HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
         problem.setTitle("Flight is no longer bookable");
         problem.setType(URI.create("urn:airline:problem:flight-departed"));
         return problem;

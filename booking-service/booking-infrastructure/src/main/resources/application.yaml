@@ -1,0 +1,57 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: booking-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/airline_booking
+    username: airline
+    password: airline
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  threads:
+    virtual:
+      enabled: true
+
+airline:
+  flight-service:
+    url: http://localhost:8081
+
+resilience4j:
+  retry:
+    instances:
+      flightService:
+        maxAttempts: 3
+        waitDuration: 200ms
+        ignoreExceptions:
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.SeatsUnavailableException
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotBookableException
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotFoundException
+  circuitbreaker:
+    instances:
+      flightService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        ignoreExceptions:
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.SeatsUnavailableException
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotBookableException
+          - com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotFoundException
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

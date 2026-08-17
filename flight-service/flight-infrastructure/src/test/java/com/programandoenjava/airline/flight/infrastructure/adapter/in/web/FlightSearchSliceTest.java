@@ -305,18 +305,18 @@ class FlightSearchSliceTest {
         @Test
         @DisplayName("should carry on where the previous page stopped")
         void shouldContinueOnTheNextPage() throws Exception {
-            final String firstPage = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
+            String firstPage = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
                             .param(PAGE, String.valueOf(FIRST_PAGE))
                             .param(SIZE, String.valueOf(PAGE_SIZE)))
                     .andReturn().getResponse().getContentAsString();
-            final String secondPage = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
+            String secondPage = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
                             .param(PAGE, String.valueOf(SECOND_PAGE))
                             .param(SIZE, String.valueOf(PAGE_SIZE)))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.page").value(SECOND_PAGE))
                     .andReturn().getResponse().getContentAsString();
 
-            final List<String> first = JsonPath.read(firstPage, FLIGHT_NUMBERS);
-            final List<String> second = JsonPath.read(secondPage, FLIGHT_NUMBERS);
+            List<String> first = JsonPath.read(firstPage, FLIGHT_NUMBERS);
+            List<String> second = JsonPath.read(secondPage, FLIGHT_NUMBERS);
 
             Assertions.assertThat(second)
                     .hasSize(PAGE_SIZE)
@@ -326,11 +326,11 @@ class FlightSearchSliceTest {
         @Test
         @DisplayName("should order by fare when the passenger asks for the dearest first")
         void shouldOrderByPriceDescending() throws Exception {
-            final String body = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
+            String body = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
                             .param(SORT, DEAREST_FIRST))
                     .andReturn().getResponse().getContentAsString();
 
-            final List<Double> prices = JsonPath.read(body, "$.content[*].price");
+            List<Double> prices = JsonPath.read(body, "$.content[*].price");
 
             Assertions.assertThat(prices)
                     .hasSize(BOOKABLE_FLIGHTS)
@@ -340,12 +340,12 @@ class FlightSearchSliceTest {
         @Test
         @DisplayName("should order by arrival when asked")
         void shouldOrderByArrival() throws Exception {
-            final String body = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
+            String body = mockMvc.perform(MockMvcRequestBuilders.get(FLIGHTS)
                             .param(ORIGIN, BOGOTA).param(DESTINATION, MEDELLIN)
                             .param(SORT, LATEST_ARRIVAL_FIRST))
                     .andReturn().getResponse().getContentAsString();
 
-            final List<String> arrivals = JsonPath.read(body, "$.content[*].arrivalTime");
+            List<String> arrivals = JsonPath.read(body, "$.content[*].arrivalTime");
 
             Assertions.assertThat(arrivals).isSortedAccordingTo(Comparator.reverseOrder());
         }

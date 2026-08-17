@@ -94,6 +94,16 @@ class SeatBlockSliceTest {
     private static final String NOT_ENOUGH_SEATS = "only " + SEATS_LEFT + " available";
     private static final String NOT_BOOKABLE = "no longer open for booking";
 
+    /*
+     * AV8001's fare in the seed. Compared as a number with tolerance rather than
+     * for equality: Jackson writes the BigDecimal as a JSON number and JsonPath
+     * reads it back as a Double, so 250000.00 and 250000.0 are the same amount
+     * and different objects.
+     */
+    private static final double FARE = 250_000.00;
+    private static final double A_CENT = 0.001;
+    private static final String CURRENCY = "COP";
+
     private static final String FIND_FLIGHT_ID =
             "SELECT id::text FROM flights WHERE flight_number = ?";
     private static final String FIND_AVAILABLE_SEATS =
@@ -128,7 +138,7 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should take the seats off the flight")
         void shouldTakeTheSeatsOffTheFlight() throws Exception {
-            final int before = availableSeats(BOOKABLE);
+            int before = availableSeats(BOOKABLE);
 
             mockMvc.perform(blockRequest(BOOKABLE, aBooking(), SEATS_WANTED, aKey()))
                     .andExpect(MockMvcResultMatchers.status().isCreated());
@@ -139,14 +149,17 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should answer with a block tied to the flight and the booking")
         void shouldAnswerWithABlockTiedToTheFlightAndTheBooking() throws Exception {
-            final String booking = aBooking();
-            final String flightId = flightIdOf(BOOKABLE);
+            String booking = aBooking();
+            String flightId = flightIdOf(BOOKABLE);
 
             mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, aKey()))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.seatBlockId").isNotEmpty())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.flightId").value(flightId))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.bookingId").value(booking))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.seats").value(SEATS_WANTED))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.pricePerSeat")
+                            .value(Matchers.closeTo(FARE, A_CENT)))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.currency").value(CURRENCY))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.blockedAt").isNotEmpty());
         }
 
@@ -169,7 +182,7 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should let two bookings hold seats on the same flight")
         void shouldLetTwoBookingsHoldSeatsOnTheSameFlight() throws Exception {
-            final int before = availableSeats(BOOKABLE);
+            int before = availableSeats(BOOKABLE);
 
             mockMvc.perform(blockRequest(BOOKABLE, aBooking(), SEATS_WANTED, aKey()));
             mockMvc.perform(blockRequest(BOOKABLE, aBooking(), SEATS_WANTED, aKey()));
@@ -193,17 +206,17 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should answer a repeated request with the block it already made")
         void shouldAnswerARepeatedRequestWithTheBlockItAlreadyMade() throws Exception {
-            final String booking = aBooking();
-            final String key = aKey();
+            String booking = aBooking();
+            String key = aKey();
 
-            final String first = mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key))
+            String first = mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key))
                     .andReturn().getResponse().getContentAsString();
-            final String second = mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key))
+            String second = mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key))
                     .andExpect(MockMvcResultMatchers.status().isCreated())
                     .andReturn().getResponse().getContentAsString();
 
-            final String firstId = JsonPath.read(first, "$.seatBlockId");
-            final String secondId = JsonPath.read(second, "$.seatBlockId");
+            String firstId = JsonPath.read(first, "$.seatBlockId");
+            String secondId = JsonPath.read(second, "$.seatBlockId");
 
             Assertions.assertThat(secondId).isEqualTo(firstId);
         }
@@ -211,9 +224,9 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should not take the seats twice for a repeated request")
         void shouldNotTakeTheSeatsTwiceForARepeatedRequest() throws Exception {
-            final String booking = aBooking();
-            final String key = aKey();
-            final int before = availableSeats(BOOKABLE);
+            String booking = aBooking();
+            String key = aKey();
+            int before = availableSeats(BOOKABLE);
 
             mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key));
             mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, key));
@@ -229,7 +242,7 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should refuse a booking that already holds seats under another key")
         void shouldRefuseABookingThatAlreadyHoldsSeatsUnderAnotherKey() throws Exception {
-            final String booking = aBooking();
+            String booking = aBooking();
 
             mockMvc.perform(blockRequest(BOOKABLE, booking, SEATS_WANTED, aKey()));
 
@@ -300,7 +313,7 @@ class SeatBlockSliceTest {
         @Test
         @DisplayName("should answer nothing for a flight that does not exist")
         void shouldAnswerNothingForAFlightThatDoesNotExist() throws Exception {
-            final String unknown = UUID.randomUUID().toString();
+            String unknown = UUID.randomUUID().toString();
 
             mockMvc.perform(post(unknown, aBooking(), SEATS_WANTED, aKey()))
                     .andExpect(MockMvcResultMatchers.status().isNotFound());

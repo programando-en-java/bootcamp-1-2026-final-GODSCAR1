@@ -1,8 +1,12 @@
 package com.programandoenjava.airline.flight.application.port.in.blockseats;
 
-import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
-
+/**
+ * Holds seats on a flight so that a booking can be made against them.
+ *
+ * <p>Repeating a command that already succeeded returns what it produced rather
+ * than taking further seats.
+ */
 public interface BlockSeatsUseCase {
 
-    SeatBlock block(BlockSeatsCommand command);
+    SeatsHeld block(BlockSeatsCommand command);
 }

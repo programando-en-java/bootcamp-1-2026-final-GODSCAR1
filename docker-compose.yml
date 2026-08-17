@@ -1,23 +1,86 @@
+# The service images copy a jar that Maven has already built, so run
+#   ./mvnw -B clean package
+# before docker compose build, or you will ship yesterday's jar.
+
 services:
 
-  postgres:
+  flight-db:
     image: postgres:17-alpine
-    container_name: airline-postgres
+    container_name: airline-flight-db
     environment:
       POSTGRES_USER: airline
       POSTGRES_PASSWORD: airline
-      POSTGRES_DB: postgres
+      POSTGRES_DB: airline_flight
+    # Only the host port differs between the two, so that both can be reached
+    # from a laptop. Inside the network they are both on 5432.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
-      - postgres-data:/var/lib/postgresql/data
+      - flight-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U airline -d postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U airline -d airline_flight" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  booking-db:
+    image: postgres:17-alpine
+    container_name: airline-booking-db
+    environment:
+      POSTGRES_USER: airline
+      POSTGRES_PASSWORD: airline
+      POSTGRES_DB: airline_booking
+    ports:
+      - "5434:5432"
+    volumes:
+      - booking-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airline -d airline_booking" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  flight-service:
+    build: ./flight-service/flight-infrastructure
+    container_name: airline-flight
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://flight-db:5432/airline_flight
+    ports:
+      - "8081:8081"
+    depends_on:
+      flight-db:
+        condition: service_healthy
+    healthcheck:
+      # wget, not curl: Alpine has the first and not the second.
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8081/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  booking-service:
+    build: ./booking-service/booking-infrastructure
+    container_name: airline-booking
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://booking-db:5432/airline_booking
+      # airline.flight-service.url, as an environment variable. The hyphen in
+      # the middle is not a typo: Spring relaxes the binding, and there is no
+      # spelling without it that maps back to the same property.
+      AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
+    ports:
+      - "8082:8082"
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      # service_healthy, not service_started: booking's first request would fail
+      # against a flight-service that is up but not yet listening.
+      flight-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8082/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  postgres-data:
+  flight-db-data:
+  booking-db-data:

@@ -125,10 +125,10 @@ class ConcurrentSeatBlockTest {
     void shouldNeverSellMoreSeatsThanTheFlightHas() throws Exception {
         leaveOnly(SEATS_AVAILABLE);
 
-        final List<Integer> statuses = blockConcurrently();
+        List<Integer> statuses = blockConcurrently();
 
-        final long granted = countGranted(statuses);
-        final long seatsSold = granted * SEATS_PER_BOOKING;
+        long granted = countGranted(statuses);
+        long seatsSold = granted * SEATS_PER_BOOKING;
 
         Assertions.assertThat(seatsSold)
                 .as("seats handed out")
@@ -148,7 +148,7 @@ class ConcurrentSeatBlockTest {
     void shouldAnswerTheLosersWithAConflict() throws Exception {
         leaveOnly(SEATS_AVAILABLE);
 
-        final List<Integer> statuses = blockConcurrently();
+        List<Integer> statuses = blockConcurrently();
 
         Assertions.assertThat(statuses).containsOnly(GRANTED, REFUSED);
     }
@@ -158,9 +158,9 @@ class ConcurrentSeatBlockTest {
     void shouldRecordOneBlockForEachSetOfSeatsItHandedOut() throws Exception {
         leaveOnly(SEATS_AVAILABLE);
 
-        final List<Integer> statuses = blockConcurrently();
+        List<Integer> statuses = blockConcurrently();
 
-        final long granted = countGranted(statuses);
+        long granted = countGranted(statuses);
 
         Assertions.assertThat(blockCount())
                 .as("blocks recorded")
@@ -176,26 +176,26 @@ class ConcurrentSeatBlockTest {
      * the contention never happens.
      */
     private List<Integer> blockConcurrently() throws Exception {
-        final CountDownLatch startLine = new CountDownLatch(1);
-        final ExecutorService pool = Executors.newFixedThreadPool(PASSENGERS);
+        CountDownLatch startLine = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(PASSENGERS);
 
         try {
-            final List<Callable<Integer>> attempts = IntStream.range(0, PASSENGERS)
+            List<Callable<Integer>> attempts = IntStream.range(0, PASSENGERS)
                     .<Callable<Integer>>mapToObj(passenger -> () -> {
                         startLine.await();
                         return askForSeats();
                     })
                     .toList();
 
-            final List<Future<Integer>> futures = attempts.stream().map(pool::submit).toList();
+            List<Future<Integer>> futures = attempts.stream().map(pool::submit).toList();
             startLine.countDown();
 
             pool.shutdown();
-            final boolean finished = pool.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            boolean finished = pool.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             Assertions.assertThat(finished).as("every attempt finished").isTrue();
 
-            final List<Integer> statuses = new ArrayList<>();
-            for (final Future<Integer> future : futures) {
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : futures) {
                 statuses.add(future.get());
             }
             return statuses;
@@ -205,9 +205,9 @@ class ConcurrentSeatBlockTest {
     }
 
     private int askForSeats() throws Exception {
-        final String bookingId = UUID.randomUUID().toString();
-        final String key = UUID.randomUUID().toString();
-        final String body = """
+        String bookingId = UUID.randomUUID().toString();
+        String key = UUID.randomUUID().toString();
+        String body = """
                 {"bookingId": "%s", "seats": %d}
                 """.formatted(bookingId, SEATS_PER_BOOKING);
 
