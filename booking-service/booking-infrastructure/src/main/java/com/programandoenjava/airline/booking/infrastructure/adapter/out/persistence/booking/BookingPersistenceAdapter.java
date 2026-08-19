@@ -4,6 +4,7 @@ import com.programandoenjava.airline.booking.application.port.out.findbooking.Fi
 import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
 import com.programandoenjava.airline.booking.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
+import com.programandoenjava.airline.booking.domain.booking.BookingId;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -20,6 +21,13 @@ class BookingPersistenceAdapter implements FindBookingPort, SaveBookingPort {
     @Transactional(readOnly = true)
     public Optional<Booking> byIdempotencyKey(final IdempotencyKey key) {
         return findByKey(key);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Booking> byId(final BookingId bookingId) {
+        return bookingJpaRepository.findById(bookingId.value())
+                .map(BookingEntityMapper::toDomain);
     }
 
     @Override

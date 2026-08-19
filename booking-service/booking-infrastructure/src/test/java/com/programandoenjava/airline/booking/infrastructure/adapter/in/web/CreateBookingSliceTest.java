@@ -64,6 +64,7 @@ import java.util.UUID;
 class CreateBookingSliceTest {
 
     private static final String BOOKINGS = "/api/v1/bookings";
+    private static final String ONE_BOOKING = "/api/v1/bookings/{bookingId}";
     private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
     private static final String COP = "COP";
@@ -279,6 +280,66 @@ class CreateBookingSliceTest {
     }
 
     @Nested
+    @DisplayName("reading a booking back")
+    class Reading {
+
+        @Test
+        @DisplayName("should answer with the booking that was made")
+        void shouldAnswerWithTheBookingThatWasMade() throws Exception {
+            UUID passenger = aPassenger();
+            UUID flight = aFlight();
+            givenSeatsAreHeld();
+            String bookingId = makeABooking(passenger, flight);
+
+            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, bookingId))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.bookingId").value(bookingId))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.passengerId")
+                            .value(passenger.toString()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.flightId")
+                            .value(flight.toString()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.seats").value(SEATS_WANTED));
+        }
+
+        /*
+         * The three fields payment-service reads. A booking that comes back
+         * owing a different amount than it was made for is how a passenger gets
+         * charged the wrong fare, and nothing between here and the end-to-end
+         * test would notice.
+         */
+        @Test
+        @DisplayName("should answer with what is owed and whether it is still owed")
+        void shouldAnswerWithWhatIsOwedAndWhetherItIsStillOwed() throws Exception {
+            givenSeatsAreHeld();
+            String bookingId = makeABooking(aPassenger(), aFlight());
+
+            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, bookingId))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.total")
+                            .value(Matchers.closeTo(TOTAL_FOR_TWO, A_CENT)))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.currency").value(COP))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.status").value(PENDING));
+        }
+
+        @Test
+        @DisplayName("should answer nothing for a booking that does not exist")
+        void shouldAnswerNothingForABookingThatDoesNotExist() throws Exception {
+            UUID unknown = UUID.randomUUID();
+
+            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, unknown))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.title")
+                            .value("Booking not found"));
+        }
+
+        @Test
+        @DisplayName("should reject an id that is not a uuid")
+        void shouldRejectAnIdThatIsNotAUuid() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, "not-a-uuid"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest());
+        }
+    }
+
+    @Nested
     @DisplayName("rejecting bad input")
     class RejectingBadInput {
 
@@ -335,6 +396,14 @@ class CreateBookingSliceTest {
      * fixed one made the second booking collide with uq_bookings_seat_block,
      * which is the index that stops two bookings claiming the same seats.
      */
+    /** Makes a booking and hands back its id, which is what a read names. */
+    private String makeABooking(final UUID passengerId, final UUID flightId) throws Exception {
+        String body = mockMvc.perform(booking(passengerId, flightId, SEATS_WANTED, aKey()))
+                .andReturn().getResponse().getContentAsString();
+
+        return JsonPath.read(body, "$.bookingId");
+    }
+
     private void givenSeatsAreHeld() {
         Currency currency = Currency.getInstance(COP);
         BigDecimal amount = new BigDecimal(FARE);

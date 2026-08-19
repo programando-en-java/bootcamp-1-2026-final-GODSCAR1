@@ -1,10 +1,12 @@
 package com.programandoenjava.airline.booking.infrastructure.config;
 
 import com.programandoenjava.airline.booking.application.port.in.createbooking.CreateBookingUseCase;
+import com.programandoenjava.airline.booking.application.port.in.readbooking.ReadBookingUseCase;
 import com.programandoenjava.airline.booking.application.port.out.findbooking.FindBookingPort;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
 import com.programandoenjava.airline.booking.application.usecase.CreateBookingService;
+import com.programandoenjava.airline.booking.application.usecase.ReadBookingService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -24,5 +26,10 @@ public class ApplicationConfiguration {
                                               final SaveBookingPort saveBookingPort,
                                               final Clock clock) {
         return new CreateBookingService(findBookingPort, holdSeatsPort, saveBookingPort, clock);
+    }
+
+    @Bean
+    ReadBookingUseCase readBookingUseCase(final FindBookingPort findBookingPort) {
+        return new ReadBookingService(findBookingPort);
     }
 }

@@ -4,11 +4,11 @@ import com.programandoenjava.airline.flight.application.port.in.blockseats.Block
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.SeatsHeld;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.BookingAlreadyHoldsSeatsException;
-import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.FlightNotFoundException;
-import com.programandoenjava.airline.flight.application.port.out.blockseats.FindSeatBlockPort;
-import com.programandoenjava.airline.flight.application.port.out.blockseats.LockFlightPort;
-import com.programandoenjava.airline.flight.application.port.out.blockseats.SaveFlightPort;
-import com.programandoenjava.airline.flight.application.port.out.blockseats.SaveSeatBlockPort;
+import com.programandoenjava.airline.flight.application.port.shared.exception.FlightNotFoundException;
+import com.programandoenjava.airline.flight.application.port.out.seatblock.FindSeatBlockPort;
+import com.programandoenjava.airline.flight.application.port.out.flight.LockFlightPort;
+import com.programandoenjava.airline.flight.application.port.out.flight.SaveFlightPort;
+import com.programandoenjava.airline.flight.application.port.out.seatblock.SaveSeatBlockPort;
 import com.programandoenjava.airline.flight.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.flight.domain.flight.Flight;
 import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
