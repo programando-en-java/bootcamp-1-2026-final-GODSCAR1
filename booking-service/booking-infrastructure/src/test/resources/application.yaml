@@ -6,6 +6,14 @@ spring:
   flyway:
     locations: classpath:db/migration,classpath:db/testdata
 
+  kafka:
+    consumer:
+      # The listeners require this, so its absence stops the context rather than
+      # quietly defaulting. A group of its own keeps a test run from consuming
+      # what a local instance is waiting for.
+      group-id: booking-service-test
+      auto-offset-reset: earliest
+
 airline:
   flight-service:
     url: http://localhost:0

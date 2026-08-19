@@ -110,6 +110,146 @@ class BookingTest {
         }
     }
 
+    @Nested
+    @DisplayName("when the payment succeeds")
+    class Confirming {
+
+        @Test
+        @DisplayName("should confirm a booking that was waiting")
+        void shouldConfirmABookingThatWasWaiting() {
+            Booking pending = aBooking();
+
+            Booking confirmed = pending.confirm();
+
+            Assertions.assertThat(confirmed.status()).isEqualTo(BookingStatus.CONFIRMED);
+        }
+
+        @Test
+        @DisplayName("should leave the booking it was made from alone")
+        void shouldLeaveTheBookingItWasMadeFromAlone() {
+            Booking pending = aBooking();
+
+            pending.confirm();
+
+            Assertions.assertThat(pending.status()).isEqualTo(BookingStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("should change nothing else about it")
+        void shouldChangeNothingElseAboutIt() {
+            Booking pending = aBooking();
+
+            Booking confirmed = pending.confirm();
+
+            Assertions.assertThat(confirmed.id()).isEqualTo(pending.id());
+            Assertions.assertThat(confirmed.total()).isEqualTo(pending.total());
+            Assertions.assertThat(confirmed.seatBlockId()).isEqualTo(pending.seatBlockId());
+            Assertions.assertThat(confirmed.createdAt()).isEqualTo(pending.createdAt());
+        }
+
+        /*
+         * The payment event arrives at least once, so the consumer will confirm
+         * the same booking twice. That is the delivery guarantee doing its job,
+         * not a caller making a mistake.
+         */
+        @Test
+        @DisplayName("should accept being confirmed a second time")
+        void shouldAcceptBeingConfirmedASecondTime() {
+            Booking confirmed = aBooking().confirm();
+
+            Booking again = confirmed.confirm();
+
+            Assertions.assertThat(again).isEqualTo(confirmed);
+        }
+
+        @Test
+        @DisplayName("should refuse to confirm a booking whose payment failed")
+        void shouldRefuseToConfirmABookingWhosePaymentFailed() {
+            Booking failed = aBooking().fail();
+
+            Assertions.assertThatThrownBy(failed::confirm)
+                    .isInstanceOf(DomainValidationException.class)
+                    .hasMessageContaining("cannot be confirmed");
+        }
+    }
+
+    @Nested
+    @DisplayName("when the payment fails")
+    class Failing {
+
+        @Test
+        @DisplayName("should fail a booking that was waiting")
+        void shouldFailABookingThatWasWaiting() {
+            Booking pending = aBooking();
+
+            Booking failed = pending.fail();
+
+            Assertions.assertThat(failed.status()).isEqualTo(BookingStatus.FAILED);
+        }
+
+        /*
+         * The seats are still held at this point. Releasing them happens over
+         * HTTP against flight-service, and the booking has no way of knowing
+         * whether that worked.
+         */
+        @Test
+        @DisplayName("should keep the hold it was made against")
+        void shouldKeepTheHoldItWasMadeAgainst() {
+            Booking pending = aBooking();
+
+            Booking failed = pending.fail();
+
+            Assertions.assertThat(failed.seatBlockId()).isEqualTo(pending.seatBlockId());
+        }
+
+        @Test
+        @DisplayName("should accept being failed a second time")
+        void shouldAcceptBeingFailedASecondTime() {
+            Booking failed = aBooking().fail();
+
+            Booking again = failed.fail();
+
+            Assertions.assertThat(again).isEqualTo(failed);
+        }
+
+        @Test
+        @DisplayName("should refuse to fail a booking that was already paid for")
+        void shouldRefuseToFailABookingThatWasAlreadyPaidFor() {
+            Booking confirmed = aBooking().confirm();
+
+            Assertions.assertThatThrownBy(confirmed::fail)
+                    .isInstanceOf(DomainValidationException.class)
+                    .hasMessageContaining("cannot be failed");
+        }
+    }
+
+    @Nested
+    @DisplayName("when asked whether it is settled")
+    class Settled {
+
+        @Test
+        @DisplayName("should say a waiting booking is not")
+        void shouldSayAWaitingBookingIsNot() {
+            Assertions.assertThat(aBooking().isSettled()).isFalse();
+        }
+
+        @Test
+        @DisplayName("should say a confirmed booking is")
+        void shouldSayAConfirmedBookingIs() {
+            Assertions.assertThat(aBooking().confirm().isSettled()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should say a failed booking is")
+        void shouldSayAFailedBookingIs() {
+            Assertions.assertThat(aBooking().fail().isSettled()).isTrue();
+        }
+    }
+
+    private static Booking aBooking() {
+        return aBookingFor(TWO_SEATS, Money.of(FARE, COP));
+    }
+
     private static Booking aBookingFor(final int seats, final Money fare) {
         return Booking.of(
                 BookingId.newId(),

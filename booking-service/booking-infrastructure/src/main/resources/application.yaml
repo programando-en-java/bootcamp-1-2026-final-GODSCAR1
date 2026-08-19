@@ -22,6 +22,16 @@ spring:
     virtual:
       enabled: true
 
+  kafka:
+    bootstrap-servers: localhost:29092
+    consumer:
+      group-id: booking-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # earliest, so a consumer joining a topic that already has messages picks
+      # them up rather than skipping to whatever arrives next.
+      auto-offset-reset: earliest
+
 airline:
   flight-service:
     url: http://localhost:8081

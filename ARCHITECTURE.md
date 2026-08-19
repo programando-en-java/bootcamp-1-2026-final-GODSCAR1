@@ -20,6 +20,7 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [011](#adr-011-idempotent-booking-creation) | Accepted | Idempotent booking creation |
 | [012](#adr-012-calling-flight-service) | Accepted | Calling flight-service |
 | [013](#adr-013-the-payment-saga) | Accepted | The payment saga |
+| [014](#adr-014-consuming-a-payment-event-once) | Accepted | Consuming a payment event once |
 
 ---
 
@@ -99,9 +100,10 @@ it reads rows and sends `payload` to `topic` keyed by `aggregate_id`. Keying by
 aggregate id routes all events for one aggregate to the same partition, which
 preserves per-aggregate ordering.
 
-Services owning an outbox: `booking`, `payment`, `checkin`. `flight` only
-responds to commands and publishes nothing. `auth` and `notification` publish
-nothing.
+Only `payment` owns an outbox today. `booking` was expected to and does not:
+everything it would announce, another service already knows, and it consumes
+rather than publishes. `checkin` will need one. `flight` only responds to
+commands, and `auth` and `notification` publish nothing.
 
 ### Consequences
 
@@ -945,3 +947,71 @@ purpose.
   deliberately left out when the enum was written, on the grounds that they were
   guesses; US-005 and US-006 are the requirements that stopped them being
   guesses, and `EXPIRED` is still not among them.
+
+---
+
+## ADR-014: Consuming a payment event once
+
+**Status:** Accepted
+
+### Context
+
+ADR-001 makes delivery at-least-once and states flatly that every consumer must
+be idempotent. booking-service is the first consumer, so this is where that
+requirement stops being a sentence.
+
+A repeat is not an edge case. The relay marks a row sent only after the broker
+acknowledges it, so a crash in between resends the message; a rebalance resends
+whatever was not committed. Confirming a booking twice is harmless, but
+releasing seats twice, or releasing seats for a booking that has since been
+confirmed, is not.
+
+### Decision
+
+**A `processed_events` table, claimed before any work.** The event id travels
+in the payload from the outbox row that produced it, and the consumer inserts it
+with `ON CONFLICT DO NOTHING`. One row inserted means this delivery does the
+work; zero means another already did.
+
+Insert-and-see rather than ask-then-insert, for the same reason as the bookings
+table: two deliveries can arrive together and a separate lookup would let both
+through.
+
+**The claim travels into the use case, not the listener.** The listener parses a
+payload and calls a method; what must not happen twice is the work, and only the
+use case knows what the work was. A consumer that deduplicated on its own would
+also have to know that confirming and failing are different amounts of work.
+
+**The domain tolerates a repeat anyway.** `Booking.confirm()` on a confirmed
+booking returns it unchanged rather than complaining, and `fail()` likewise. The
+opposite transition still throws: a booking cannot travel both roads. That makes
+the table an optimisation for the ordinary path and a guarantee for the rest,
+instead of the only thing standing between a redelivery and a broken invariant.
+
+**Failing marks first and releases second.** The booking becomes `FAILED` in a
+local transaction; the seats go back over HTTP afterwards, outside it. The order
+is the decision: a crash after marking leaves seats held on a booking that says
+it failed, which a sweep can find and fix. A crash after releasing would leave a
+`PENDING` booking with no seats, which nothing could tell apart from a booking
+still waiting.
+
+`seats_released_at` records that the second step finished. It is a column rather
+than a fourth status because the status is what a passenger sees, and whether
+the compensation completed is the saga's own bookkeeping.
+
+### Consequences
+
+- **Nothing retries the release.** If flight-service is unreachable past
+  Resilience4j's attempts, the booking stays `FAILED` with `seats_released_at`
+  unset and the seats stay held. The partial index `idx_bookings_awaiting_release`
+  exists for the sweep that would fix this; the sweep does not.
+- **`processed_events` is never purged.** It grows with every message this
+  service consumes. Same gap as the idempotency keys in ADR-011, and the same
+  answer: a retention job.
+- A message naming a booking that does not exist raises, so Kafka redelivers it
+  forever. Nothing sends it to a dead letter topic, which is what should happen
+  to a message no amount of retrying will fix.
+- The claim is committed in its own transaction, before the work. A crash
+  between claiming and finishing means the event is marked handled and the work
+  is not done. Doing both in one transaction would fix that for the confirm
+  path, and cannot for the fail path, whose second step is a network call.

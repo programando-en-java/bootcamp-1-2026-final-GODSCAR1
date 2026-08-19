@@ -5,6 +5,8 @@ import com.programandoenjava.airline.booking.EnableDatabaseTest;
 import com.programandoenjava.airline.booking.TestcontainersConfiguration;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsCommand;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
+import com.programandoenjava.airline.booking.application.port.out.processedevents.ProcessedEventsPort;
+import com.programandoenjava.airline.booking.application.port.out.releaseseats.ReleaseSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.SeatsHeld;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.exception.SeatsUnavailableException;
 import com.programandoenjava.airline.booking.domain.booking.SeatBlockId;
@@ -97,6 +99,17 @@ class CreateBookingSliceTest {
      */
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
+
+    /*
+     * Present so the context can be built, and not otherwise used. Settling a
+     * booking arrives over Kafka and has its own path; this slice is about the
+     * endpoint that creates one.
+     */
+    @MockitoBean
+    private ProcessedEventsPort processedEventsPort;
+
+    @MockitoBean
+    private ReleaseSeatsPort releaseSeatsPort;
 
     @TestBean
     private Clock clock;

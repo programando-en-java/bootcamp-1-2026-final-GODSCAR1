@@ -115,6 +115,7 @@ services:
       # the middle is not a typo: Spring relaxes the binding, and there is no
       # spelling without it that maps back to the same property.
       AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
     ports:
       - "8082:8082"
     depends_on:
@@ -123,6 +124,8 @@ services:
       # service_healthy, not service_started: booking's first request would fail
       # against a flight-service that is up but not yet listening.
       flight-service:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8082/actuator/health" ]

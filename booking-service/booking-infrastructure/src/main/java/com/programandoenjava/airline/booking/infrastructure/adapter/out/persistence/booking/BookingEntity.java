@@ -53,6 +53,9 @@ class BookingEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "seats_released_at")
+    private Instant seatsReleasedAt;
+
     protected BookingEntity() {
         // required by JPA
     }
@@ -103,5 +106,13 @@ class BookingEntity {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    void settleAs(final BookingStatus newStatus) {
+        this.status = newStatus;
+    }
+
+    void recordSeatsReleased(final Instant at) {
+        this.seatsReleasedAt = at;
     }
 }
