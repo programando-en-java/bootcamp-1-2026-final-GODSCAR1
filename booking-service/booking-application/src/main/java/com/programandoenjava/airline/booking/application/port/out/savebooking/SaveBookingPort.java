@@ -3,6 +3,7 @@ package com.programandoenjava.airline.booking.application.port.out.savebooking;
 import com.programandoenjava.airline.booking.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface SaveBookingPort {
@@ -14,4 +15,9 @@ public interface SaveBookingPort {
      * between the question and the write.
      */
     Optional<Booking> saveIfNew(Booking booking, IdempotencyKey key);
+
+    void updateStatus(Booking booking);
+
+    /** Records that the seats a failed booking held have gone back. */
+    void markSeatsReleased(Booking booking, Instant at);
 }

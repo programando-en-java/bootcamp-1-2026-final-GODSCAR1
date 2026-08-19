@@ -19,6 +19,8 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [010](#adr-010-testing-style) | Accepted | Testing style |
 | [011](#adr-011-idempotent-booking-creation) | Accepted | Idempotent booking creation |
 | [012](#adr-012-calling-flight-service) | Accepted | Calling flight-service |
+| [013](#adr-013-the-payment-saga) | Accepted | The payment saga |
+| [014](#adr-014-consuming-a-payment-event-once) | Accepted | Consuming a payment event once |
 
 ---
 
@@ -98,9 +100,10 @@ it reads rows and sends `payload` to `topic` keyed by `aggregate_id`. Keying by
 aggregate id routes all events for one aggregate to the same partition, which
 preserves per-aggregate ordering.
 
-Services owning an outbox: `booking`, `payment`, `checkin`. `flight` only
-responds to commands and publishes nothing. `auth` and `notification` publish
-nothing.
+Only `payment` owns an outbox today. `booking` was expected to and does not:
+everything it would announce, another service already knows, and it consumes
+rather than publishes. `checkin` will need one. `flight` only responds to
+commands, and `auth` and `notification` publish nothing.
 
 ### Consequences
 
@@ -854,3 +857,161 @@ are ordinary queries and JPA is what flight-service already uses.
 - A booking whose seats were held but whose save then failed leaves a hold in
   flight-service that nobody will claim. Nothing releases it today. The expiry
   sweep that ADR-008 anticipates is what would, and it arrives with payment.
+
+---
+
+## ADR-013: The payment saga
+
+**Status:** Accepted
+
+### Context
+
+Paying for a booking spans three services and cannot be one transaction.
+payment-service takes the money, booking-service confirms the booking, and
+flight-service either keeps the held seats or takes them back. Any of the three
+can fail after the others have already acted, which is what makes this a saga
+rather than a sequence.
+
+Two questions had to be settled before any of it could be written: who starts
+the payment, and who compensates when it fails.
+
+### Who starts it
+
+**The passenger calls payment-service.** `POST /api/v1/payments` names the
+booking and carries the card. US-005 says a passenger pays a booking, and this
+is that sentence with nothing added.
+
+The alternatives were rejected for concrete reasons rather than taste.
+
+Having booking-service publish `BookingCreated` and payment-service react would
+have been more event-driven, but there are no card details anywhere for it to
+react with: the payment would have to charge something already on file, and
+nothing is. It would also mean a booking that pays itself, which is not what
+either story describes.
+
+Having the passenger call booking-service, which then calls payment over Feign,
+keeps booking as the single front door. It was rejected because it makes a
+synchronous command out of something that is not competing for anything.
+ADR-004 draws that line at contention: seats are contended and go synchronously,
+a payment is not and does not.
+
+### The shape
+
+1. The passenger posts a payment naming a booking.
+2. payment-service asks booking-service what is owed, so the amount is the one
+   on the booking rather than the one the caller typed.
+3. It charges, and writes the result.
+4. It publishes `payment.succeeded.v1` or `payment.failed.v1` through the outbox
+   of ADR-001.
+5. booking-service consumes. On success the booking becomes `CONFIRMED`; on
+   failure it becomes `FAILED` and the held seats are released through
+   flight-service.
+
+Step 2 is not optional. A payment whose amount comes from the request body is a
+payment a caller can under-pay, and the booking is the only place that knows
+what the fare was when the seats were held.
+
+Step 5 is where the compensation lives, and it lives in booking-service on
+purpose. booking is the service that knows which hold belongs to which booking;
+payment-service has no business knowing flight-service exists.
+
+### The gateway
+
+There is no real acquirer, so `PaymentGatewayPort` has a stand-in adapter behind
+it. **Its outcome is decided by the card number, not by chance**: a card in a
+declining range fails, everything else succeeds.
+
+A random adapter would make US-006 untestable in any useful sense — an
+end-to-end test that fails one run in ten teaches people to re-run rather than
+to read. Deciding on input also means a demonstration can show either path on
+purpose.
+
+### Consequences
+
+- **Bookings become eventually consistent.** Between the payment succeeding and
+  booking-service consuming the event, a booking is paid and still says
+  `PENDING`. Nothing today closes that window, and any read of a booking has to
+  be understood as a snapshot rather than a verdict.
+- **A failed payment leaves seats held until the compensation runs.** That is the
+  point of the compensation, and it is also a window during which those seats
+  are sold to nobody. The expiry sweep ADR-008 anticipates is what would bound
+  it; the compensation is what makes it short in the ordinary case.
+- **payment-service depends on booking-service** to learn the amount, so paying
+  is impossible while booking is down. Acceptable: there is nothing to pay for
+  if the booking cannot be read.
+- **Nothing retries the compensation yet.** If the release call fails, the
+  booking is `FAILED` and the seats stay held. Making the consumer retry, and
+  making the release idempotent, is what closes that — the second half is done
+  (ADR-014), the first is not.
+- `BookingStatus` grows from one value to three. `CONFIRMED` and `EXPIRED` were
+  deliberately left out when the enum was written, on the grounds that they were
+  guesses; US-005 and US-006 are the requirements that stopped them being
+  guesses, and `EXPIRED` is still not among them.
+
+---
+
+## ADR-014: Consuming a payment event once
+
+**Status:** Accepted
+
+### Context
+
+ADR-001 makes delivery at-least-once and states flatly that every consumer must
+be idempotent. booking-service is the first consumer, so this is where that
+requirement stops being a sentence.
+
+A repeat is not an edge case. The relay marks a row sent only after the broker
+acknowledges it, so a crash in between resends the message; a rebalance resends
+whatever was not committed. Confirming a booking twice is harmless, but
+releasing seats twice, or releasing seats for a booking that has since been
+confirmed, is not.
+
+### Decision
+
+**A `processed_events` table, claimed before any work.** The event id travels
+in the payload from the outbox row that produced it, and the consumer inserts it
+with `ON CONFLICT DO NOTHING`. One row inserted means this delivery does the
+work; zero means another already did.
+
+Insert-and-see rather than ask-then-insert, for the same reason as the bookings
+table: two deliveries can arrive together and a separate lookup would let both
+through.
+
+**The claim travels into the use case, not the listener.** The listener parses a
+payload and calls a method; what must not happen twice is the work, and only the
+use case knows what the work was. A consumer that deduplicated on its own would
+also have to know that confirming and failing are different amounts of work.
+
+**The domain tolerates a repeat anyway.** `Booking.confirm()` on a confirmed
+booking returns it unchanged rather than complaining, and `fail()` likewise. The
+opposite transition still throws: a booking cannot travel both roads. That makes
+the table an optimisation for the ordinary path and a guarantee for the rest,
+instead of the only thing standing between a redelivery and a broken invariant.
+
+**Failing marks first and releases second.** The booking becomes `FAILED` in a
+local transaction; the seats go back over HTTP afterwards, outside it. The order
+is the decision: a crash after marking leaves seats held on a booking that says
+it failed, which a sweep can find and fix. A crash after releasing would leave a
+`PENDING` booking with no seats, which nothing could tell apart from a booking
+still waiting.
+
+`seats_released_at` records that the second step finished. It is a column rather
+than a fourth status because the status is what a passenger sees, and whether
+the compensation completed is the saga's own bookkeeping.
+
+### Consequences
+
+- **Nothing retries the release.** If flight-service is unreachable past
+  Resilience4j's attempts, the booking stays `FAILED` with `seats_released_at`
+  unset and the seats stay held. The partial index `idx_bookings_awaiting_release`
+  exists for the sweep that would fix this; the sweep does not.
+- **`processed_events` is never purged.** It grows with every message this
+  service consumes. Same gap as the idempotency keys in ADR-011, and the same
+  answer: a retention job.
+- A message naming a booking that does not exist raises, so Kafka redelivers it
+  forever. Nothing sends it to a dead letter topic, which is what should happen
+  to a message no amount of retrying will fix.
+- The claim is committed in its own transaction, before the work. A crash
+  between claiming and finishing means the event is marked handled and the work
+  is not done. Doing both in one transaction would fix that for the confirm
+  path, and cannot for the fail path, whose second step is a network call.

@@ -1,0 +1,64 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5435/airline_payment
+    username: airline
+    password: airline
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  threads:
+    virtual:
+      enabled: true
+
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # The relay marks a row sent only after the broker says it has it, and
+      # acks=all is what makes that answer mean something.
+      acks: all
+
+airline:
+  booking-service:
+    url: http://localhost:8082
+  outbox:
+    poll-interval: PT1S
+
+resilience4j:
+  retry:
+    instances:
+      bookingService:
+        maxAttempts: 3
+        waitDuration: 200ms
+        ignoreExceptions:
+          - com.programandoenjava.airline.payment.application.port.out.readbooking.exception.BookingNotFoundException
+  circuitbreaker:
+    instances:
+      bookingService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        ignoreExceptions:
+          - com.programandoenjava.airline.payment.application.port.out.readbooking.exception.BookingNotFoundException
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

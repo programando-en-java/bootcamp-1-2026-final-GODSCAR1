@@ -77,10 +77,15 @@ class SeatBlockSliceTest {
 
     private static final String BOOKABLE = "AV8001";
 
+    /** A second bookable flight, so a hold can be asked for on the wrong one. */
+    private static final String ANOTHER_BOOKABLE = "AV8002";
+
     /** The one flight in the seed whose departure sits behind the fixed clock. */
     private static final String DEPARTED = "AV9000";
 
     private static final String SEAT_BLOCKS = "/api/v1/flights/{flightId}/seat-blocks";
+    private static final String SEAT_BLOCK =
+            "/api/v1/flights/{flightId}/seat-blocks/{seatBlockId}";
     private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
     private static final int SEATS_WANTED = 2;
@@ -321,6 +326,98 @@ class SeatBlockSliceTest {
     }
 
     @Nested
+    @DisplayName("releasing seats")
+    class Releasing {
+
+        @Test
+        @DisplayName("should put the seats back on the flight")
+        void shouldPutTheSeatsBackOnTheFlight() throws Exception {
+            final int before = availableSeats(BOOKABLE);
+            final String seatBlockId = holdSeatsOn(BOOKABLE);
+
+            mockMvc.perform(releaseRequest(BOOKABLE, seatBlockId))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent());
+
+            Assertions.assertThat(availableSeats(BOOKABLE)).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("should remove the record of the hold")
+        void shouldRemoveTheRecordOfTheHold() throws Exception {
+            final String seatBlockId = holdSeatsOn(BOOKABLE);
+
+            mockMvc.perform(releaseRequest(BOOKABLE, seatBlockId));
+
+            Assertions.assertThat(blockCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("should let the seats be sold again")
+        void shouldLetTheSeatsBeSoldAgain() throws Exception {
+            leaveOnly(SEATS_LEFT, BOOKABLE);
+            final String seatBlockId = holdSeatsOn(BOOKABLE);
+
+            mockMvc.perform(releaseRequest(BOOKABLE, seatBlockId));
+
+            mockMvc.perform(blockRequest(BOOKABLE, aBooking(), SEATS_LEFT, aKey()))
+                    .andExpect(MockMvcResultMatchers.status().isCreated());
+        }
+
+        /*
+         * The saga retries this step until it is told the seats are back, so a
+         * second release has to look like the first.
+         */
+        @Test
+        @DisplayName("should succeed when the hold is already gone")
+        void shouldSucceedWhenTheHoldIsAlreadyGone() throws Exception {
+            final int before = availableSeats(BOOKABLE);
+            final String seatBlockId = holdSeatsOn(BOOKABLE);
+
+            mockMvc.perform(releaseRequest(BOOKABLE, seatBlockId));
+            mockMvc.perform(releaseRequest(BOOKABLE, seatBlockId))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent());
+
+            Assertions.assertThat(availableSeats(BOOKABLE)).isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("should succeed when there was never a hold")
+        void shouldSucceedWhenThereWasNeverAHold() throws Exception {
+            final String unknown = UUID.randomUUID().toString();
+
+            mockMvc.perform(releaseRequest(BOOKABLE, unknown))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent());
+        }
+
+        /*
+         * A block on another flight is not this flight's to give back. Nothing is
+         * released, and the answer is the same as for a hold that never existed.
+         */
+        @Test
+        @DisplayName("should leave alone a hold that belongs to another flight")
+        void shouldLeaveAloneAHoldThatBelongsToAnotherFlight() throws Exception {
+            final int before = availableSeats(BOOKABLE);
+            final String seatBlockId = holdSeatsOn(BOOKABLE);
+
+            mockMvc.perform(releaseRequest(ANOTHER_BOOKABLE, seatBlockId))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent());
+
+            Assertions.assertThat(availableSeats(BOOKABLE)).isEqualTo(before - SEATS_WANTED);
+            Assertions.assertThat(blockCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should answer nothing for a flight that does not exist")
+        void shouldAnswerNothingForAFlightThatDoesNotExist() throws Exception {
+            final String unknownFlight = UUID.randomUUID().toString();
+            final String seatBlockId = UUID.randomUUID().toString();
+
+            mockMvc.perform(MockMvcRequestBuilders.delete(SEAT_BLOCK, unknownFlight, seatBlockId))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound());
+        }
+    }
+
+    @Nested
     @DisplayName("rejecting bad input")
     class RejectingBadInput {
 
@@ -365,6 +462,19 @@ class SeatBlockSliceTest {
             mockMvc.perform(post("not-a-uuid", aBooking(), SEATS_WANTED, aKey()))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
         }
+    }
+
+    /** Holds seats and hands back the id of the block, which is what a release names. */
+    private String holdSeatsOn(final String flightNumber) throws Exception {
+        String body = mockMvc.perform(blockRequest(flightNumber, aBooking(), SEATS_WANTED, aKey()))
+                .andReturn().getResponse().getContentAsString();
+
+        return JsonPath.read(body, "$.seatBlockId");
+    }
+
+    private MockHttpServletRequestBuilder releaseRequest(final String flightNumber,
+                                                         final String seatBlockId) {
+        return MockMvcRequestBuilders.delete(SEAT_BLOCK, flightIdOf(flightNumber), seatBlockId);
     }
 
     private MockHttpServletRequestBuilder blockRequest(final String flightNumber,

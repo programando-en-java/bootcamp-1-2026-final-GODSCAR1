@@ -1,5 +1,6 @@
 package com.programandoenjava.airline.booking.infrastructure.adapter.in.web;
 
+import com.programandoenjava.airline.booking.application.port.in.readbooking.exception.BookingNotFoundException;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotBookableException;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.exception.FlightNotFoundException;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.exception.SeatsUnavailableException;
@@ -64,6 +65,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleFlightNotFound(final FlightNotFoundException exception) {
         return problem(HttpStatus.NOT_FOUND, "Flight not found",
                 exception.getMessage(), "flight-not-found");
+    }
+
+    @ExceptionHandler(BookingNotFoundException.class)
+    ProblemDetail handleBookingNotFound(final BookingNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "Booking not found",
+                exception.getMessage(), "booking-not-found");
     }
 
     @ExceptionHandler(CallNotPermittedException.class)

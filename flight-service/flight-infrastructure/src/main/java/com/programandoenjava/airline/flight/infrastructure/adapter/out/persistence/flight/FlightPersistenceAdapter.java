@@ -1,7 +1,7 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.flight;
 
-import com.programandoenjava.airline.flight.application.port.out.blockseats.LockFlightPort;
-import com.programandoenjava.airline.flight.application.port.out.blockseats.SaveFlightPort;
+import com.programandoenjava.airline.flight.application.port.out.flight.LockFlightPort;
+import com.programandoenjava.airline.flight.application.port.out.flight.SaveFlightPort;
 import com.programandoenjava.airline.flight.application.port.shared.PageResult;
 import com.programandoenjava.airline.flight.application.port.out.searchflights.FlightSearchCriteria;
 import com.programandoenjava.airline.flight.application.port.out.searchflights.LoadFlightsPort;

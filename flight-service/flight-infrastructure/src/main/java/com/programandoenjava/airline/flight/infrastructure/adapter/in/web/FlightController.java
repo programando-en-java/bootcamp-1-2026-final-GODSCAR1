@@ -3,6 +3,8 @@ package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsCommand;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.SeatsHeld;
+import com.programandoenjava.airline.flight.application.port.in.releaseseats.ReleaseSeatsCommand;
+import com.programandoenjava.airline.flight.application.port.in.releaseseats.ReleaseSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.flight.application.port.shared.PageQuery;
 import com.programandoenjava.airline.flight.application.port.shared.PageResult;
@@ -11,6 +13,7 @@ import com.programandoenjava.airline.flight.application.port.in.searchflights.Se
 import com.programandoenjava.airline.flight.domain.flight.Flight;
 import com.programandoenjava.airline.flight.domain.flight.FlightId;
 import com.programandoenjava.airline.flight.domain.seatblock.BookingId;
+import com.programandoenjava.airline.flight.domain.seatblock.SeatBlockId;
 import com.programandoenjava.airline.flight.domain.seatblock.SeatCount;
 import com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto.BlockSeatsRequest;
 import com.programandoenjava.airline.flight.infrastructure.adapter.in.web.dto.FlightResponse;
@@ -32,10 +35,14 @@ class FlightController {
 
     private final BlockSeatsUseCase blockSeatsUseCase;
 
+    private final ReleaseSeatsUseCase releaseSeatsUseCase;
+
     FlightController(final SearchFlightsUseCase searchFlightsUseCase,
-                     final BlockSeatsUseCase blockSeatsUseCase) {
+                     final BlockSeatsUseCase blockSeatsUseCase,
+                     final ReleaseSeatsUseCase releaseSeatsUseCase) {
         this.searchFlightsUseCase = searchFlightsUseCase;
         this.blockSeatsUseCase = blockSeatsUseCase;
+        this.releaseSeatsUseCase = releaseSeatsUseCase;
     }
 
 
@@ -76,5 +83,21 @@ class FlightController {
         SeatsHeld held = blockSeatsUseCase.block(command);
 
         return SeatBlockResponse.from(held);
+    }
+
+    /**
+     * Answers 204 whether the hold was there or not, so the saga can retry. No
+     * idempotency key: the block's own id already says what the request is about.
+     */
+    @DeleteMapping("/{flightId}/seat-blocks/{seatBlockId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void releaseSeats(@PathVariable final UUID flightId,
+                      @PathVariable final UUID seatBlockId) {
+
+        FlightId flight = new FlightId(flightId);
+        SeatBlockId seatBlock = new SeatBlockId(seatBlockId);
+        ReleaseSeatsCommand command = new ReleaseSeatsCommand(flight, seatBlock);
+
+        releaseSeatsUseCase.release(command);
     }
 }

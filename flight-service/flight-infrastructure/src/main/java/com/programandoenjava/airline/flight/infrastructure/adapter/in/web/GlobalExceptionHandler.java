@@ -1,7 +1,7 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 
 import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.BookingAlreadyHoldsSeatsException;
-import com.programandoenjava.airline.flight.application.port.in.blockseats.exception.FlightNotFoundException;
+import com.programandoenjava.airline.flight.application.port.shared.exception.FlightNotFoundException;
 import com.programandoenjava.airline.flight.domain.flight.exception.FlightDepartedException;
 import com.programandoenjava.airline.flight.domain.flight.exception.InsufficientSeatsException;
 import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;

@@ -10,4 +10,6 @@ interface SeatBlockJpaRepository extends JpaRepository<SeatBlockEntity, UUID> {
     Optional<SeatBlockEntity> findByIdempotencyKey(String idempotencyKey);
 
     boolean existsByBookingId(UUID bookingId);
+
+    Optional<SeatBlockEntity> findByIdAndFlightId(UUID id, UUID flightId);
 }

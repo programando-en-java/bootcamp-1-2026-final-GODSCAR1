@@ -3,6 +3,7 @@ package com.programandoenjava.airline.booking.infrastructure.adapter.out.flight;
 import com.programandoenjava.airline.booking.infrastructure.adapter.out.flight.dto.BlockSeatsRequest;
 import com.programandoenjava.airline.booking.infrastructure.adapter.out.flight.dto.SeatBlockResponse;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,4 +20,8 @@ public interface FlightClient {
     SeatBlockResponse blockSeats(@PathVariable UUID flightId,
                                  @RequestHeader("Idempotency-Key") String idempotencyKey,
                                  @RequestBody BlockSeatsRequest request);
+
+    /** Answers 204 whether the hold was there or not, so a retry is free. */
+    @DeleteMapping("/api/v1/flights/{flightId}/seat-blocks/{seatBlockId}")
+    void releaseSeats(@PathVariable UUID flightId, @PathVariable UUID seatBlockId);
 }

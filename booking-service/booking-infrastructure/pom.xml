@@ -66,6 +66,18 @@
             <artifactId>resilience4j-spring-boot4</artifactId>
         </dependency>
 
+        <!--
+          Consuming what payment-service announces (ADR-001).
+
+          spring-boot-kafka, not spring-kafka: Boot 4 moved the autoconfiguration
+          into a module of its own, so spring-kafka alone puts the classes on the
+          classpath with nothing configuring them.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-kafka</artifactId>
+        </dependency>
+
         <!-- Boot 4 modularization: the Flyway starter, not flyway-core. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -116,6 +128,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- testcontainers-kafka, not kafka: version 2 prefixed every module. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
             <scope>test</scope>
         </dependency>
 

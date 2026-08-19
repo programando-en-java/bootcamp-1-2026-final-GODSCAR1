@@ -11,8 +11,8 @@ services:
       POSTGRES_USER: airline
       POSTGRES_PASSWORD: airline
       POSTGRES_DB: airline_flight
-    # Only the host port differs between the two, so that both can be reached
-    # from a laptop. Inside the network they are both on 5432.
+    # Only the host port differs between the databases, so that all of them can
+    # be reached from a laptop. Inside the network they are all on 5432.
     ports:
       - "5433:5432"
     volumes:
@@ -40,6 +40,55 @@ services:
       timeout: 5s
       retries: 5
 
+  payment-db:
+    image: postgres:17-alpine
+    container_name: airline-payment-db
+    environment:
+      POSTGRES_USER: airline
+      POSTGRES_PASSWORD: airline
+      POSTGRES_DB: airline_payment
+    ports:
+      - "5435:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airline -d airline_payment" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: airline-kafka
+    environment:
+      # KRaft: one process that is both broker and controller. ZooKeeper stopped
+      # being required in Kafka 4, and one container is enough for a laptop.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      # Two advertised listeners because the right address depends on where the
+      # client stands: kafka:9092 from inside the network, localhost:29092 from
+      # the host. One value cannot be correct for both.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # One broker, so nothing can be replicated further than itself.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "29092:29092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
   flight-service:
     build: ./flight-service/flight-infrastructure
     container_name: airline-flight
@@ -66,6 +115,7 @@ services:
       # the middle is not a typo: Spring relaxes the binding, and there is no
       # spelling without it that maps back to the same property.
       AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
     ports:
       - "8082:8082"
     depends_on:
@@ -75,8 +125,32 @@ services:
       # against a flight-service that is up but not yet listening.
       flight-service:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8082/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-service:
+    build: ./payment-service/payment-infrastructure
+    container_name: airline-payment
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-db:5432/airline_payment
+      AIRLINE_BOOKING-SERVICE_URL: http://booking-service:8082
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8083:8083"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8083/actuator/health" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -84,3 +158,5 @@ services:
 volumes:
   flight-db-data:
   booking-db-data:
+  payment-db-data:
+  kafka-data:

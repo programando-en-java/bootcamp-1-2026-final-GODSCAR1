@@ -64,4 +64,44 @@ public record Booking(
         return new Booking(id, passengerId, flightId, seatBlockId, seats,
                 pricePerSeat, total, BookingStatus.PENDING, now);
     }
+
+    /**
+     * Confirming a booking already confirmed returns it unchanged rather than
+     * complaining. Delivery of the payment event is at-least-once, so the
+     * consumer will see the same one twice, and a second confirmation is that
+     * event arriving again — not a mistake to report.
+     */
+    public Booking confirm() {
+        if (status == BookingStatus.CONFIRMED) {
+            return this;
+        }
+        if (status == BookingStatus.FAILED) {
+            throw new DomainValidationException(
+                    "Booking " + id.value() + " failed and cannot be confirmed");
+        }
+
+        return withStatus(BookingStatus.CONFIRMED);
+    }
+
+    /** Same reasoning as confirm: a repeat is the event arriving twice. */
+    public Booking fail() {
+        if (status == BookingStatus.FAILED) {
+            return this;
+        }
+        if (status == BookingStatus.CONFIRMED) {
+            throw new DomainValidationException(
+                    "Booking " + id.value() + " is confirmed and cannot be failed");
+        }
+
+        return withStatus(BookingStatus.FAILED);
+    }
+
+    public boolean isSettled() {
+        return status != BookingStatus.PENDING;
+    }
+
+    private Booking withStatus(final BookingStatus newStatus) {
+        return new Booking(id, passengerId, flightId, seatBlockId, seats,
+                pricePerSeat, total, newStatus, createdAt);
+    }
 }
