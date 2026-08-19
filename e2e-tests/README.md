@@ -1,7 +1,8 @@
 # End-to-end tests
 
-The stack is brought up by the tests themselves: three databases, a broker and
-the three services, built from the same Dockerfiles the compose file uses.
+The stack is brought up by the tests themselves: a database per service, a
+broker and the four services, built from the same Dockerfiles the compose file
+uses.
 
 ```
 ./mvnw -B clean package
@@ -19,7 +20,7 @@ every few minutes is worth more than one that covers a little extra.
 
 **The Feign decoders.** Every slice mocks the port a decoder sits behind, so the
 translation from a 409 out of flight-service into a conflict out of
-booking-service runs here and nowhere else — which is how a decoder that missed
+booking-service runs here and nowhere else, which is how a decoder that missed
 422 and answered 502 was found.
 
 **The saga.** A payment settles a booking through a Kafka message, and a refused
@@ -27,6 +28,11 @@ payment sends seats back to flight-service over HTTP. Both cross three services;
 neither can be shown by anything smaller.
 
 Settling is asynchronous, so those assertions poll rather than checking once.
+
+**Check-in reading two services.** Its slice mocks both ports, so that
+booking-service answers with a status check-in understands, and flight-service
+answers with a departure it can measure its window against, is shown here alone.
+The window is also the reason those flights depart in hours rather than days.
 
 ## Flights
 
