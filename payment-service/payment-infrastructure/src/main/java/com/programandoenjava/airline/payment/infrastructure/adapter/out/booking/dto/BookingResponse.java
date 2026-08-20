@@ -8,6 +8,7 @@ import java.util.UUID;
  * ignored on purpose, so a field added there does not break anything here.
  */
 public record BookingResponse(UUID bookingId,
+                              UUID passengerId,
                               BigDecimal total,
                               String currency,
                               String status) {

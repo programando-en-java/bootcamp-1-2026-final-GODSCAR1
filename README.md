@@ -137,13 +137,15 @@ mvn test
 
 ## Arquitectura basada en eventos
 
-El sistema usa **Spring Events** para desacoplar servicios.
+El sistema usa **Kafka** para desacoplar servicios. Cada publicador escribe el
+mensaje en su propia tabla `outbox`, dentro de la transacción que causó el
+hecho, y un relay lo lleva al topic (ADR-001).
 
 ### Eventos principales
 
-* `BookingCreatedEvent`
-* `PaymentProcessedEvent`
-* `CheckInCompletedEvent`
+* `booking.created.v1`
+* `payment.succeeded.v1` y `payment.failed.v1`
+* `checkin.completed.v1`
 
 ---
 

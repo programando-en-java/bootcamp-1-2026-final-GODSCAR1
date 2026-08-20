@@ -31,10 +31,18 @@ spring:
       # earliest, so a consumer joining a topic that already has messages picks
       # them up rather than skipping to whatever arrives next.
       auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # The relay marks a row sent only after the broker says it has it, and
+      # acks=all is what makes that answer mean something.
+      acks: all
 
 airline:
   flight-service:
     url: http://localhost:8081
+  outbox:
+    poll-interval: PT1S
 
 resilience4j:
   retry:

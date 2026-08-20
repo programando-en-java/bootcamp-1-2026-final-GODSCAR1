@@ -6,7 +6,6 @@ import com.programandoenjava.airline.booking.application.port.out.findbooking.Fi
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsCommand;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.SeatsHeld;
-import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
 import com.programandoenjava.airline.booking.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
 import com.programandoenjava.airline.booking.domain.booking.BookingId;
@@ -20,16 +19,16 @@ public class CreateBookingService implements CreateBookingUseCase {
 
     private final FindBookingPort findBooking;
     private final HoldSeatsPort holdSeats;
-    private final SaveBookingPort saveBooking;
+    private final BookingRecorder recorder;
     private final Clock clock;
 
     public CreateBookingService(final FindBookingPort findBooking,
                                 final HoldSeatsPort holdSeats,
-                                final SaveBookingPort saveBooking,
+                                final BookingRecorder recorder,
                                 final Clock clock) {
         this.findBooking = findBooking;
         this.holdSeats = holdSeats;
-        this.saveBooking = saveBooking;
+        this.recorder = recorder;
         this.clock = clock;
     }
 
@@ -61,8 +60,6 @@ public class CreateBookingService implements CreateBookingUseCase {
                 fare,
                 now);
 
-        Optional<Booking> lostTheRace = saveBooking.saveIfNew(booking, key);
-
-        return lostTheRace.orElse(booking);
+        return recorder.record(booking, key);
     }
 }

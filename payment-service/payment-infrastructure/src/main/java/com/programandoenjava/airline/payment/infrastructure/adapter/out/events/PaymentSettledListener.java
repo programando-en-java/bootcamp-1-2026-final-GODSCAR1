@@ -43,12 +43,13 @@ class PaymentSettledListener {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(final PaymentSettled settled) {
         Payment payment = settled.payment();
+        UUID passengerId = settled.passengerId().value();
         UUID eventId = UUID.randomUUID();
 
         String topic = payment.hasSucceeded() ? PaymentTopics.SUCCEEDED : PaymentTopics.FAILED;
         Object event = payment.hasSucceeded()
-                ? succeeded(eventId, payment)
-                : failed(eventId, payment);
+                ? succeeded(eventId, payment, passengerId)
+                : failed(eventId, payment, passengerId);
 
         String payload = objectMapper.writeValueAsString(event);
         String bookingId = payment.bookingId().value().toString();
@@ -56,21 +57,27 @@ class PaymentSettledListener {
         outbox.write(AGGREGATE_TYPE, bookingId, topic, payload, clock.instant());
     }
 
-    private static PaymentSucceededEvent succeeded(final UUID eventId, final Payment payment) {
+    private static PaymentSucceededEvent succeeded(final UUID eventId,
+                                                   final Payment payment,
+                                                   final UUID passengerId) {
         return new PaymentSucceededEvent(
                 eventId,
                 payment.id().value(),
                 payment.bookingId().value(),
+                passengerId,
                 payment.amount().amount(),
                 payment.amount().currency().getCurrencyCode(),
                 payment.processedAt());
     }
 
-    private static PaymentFailedEvent failed(final UUID eventId, final Payment payment) {
+    private static PaymentFailedEvent failed(final UUID eventId,
+                                             final Payment payment,
+                                             final UUID passengerId) {
         return new PaymentFailedEvent(
                 eventId,
                 payment.id().value(),
                 payment.bookingId().value(),
+                passengerId,
                 payment.amount().amount(),
                 payment.amount().currency().getCurrencyCode(),
                 payment.processedAt());

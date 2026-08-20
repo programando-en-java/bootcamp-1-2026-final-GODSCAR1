@@ -7,6 +7,7 @@ import java.util.UUID;
 public record PaymentFailedEvent(UUID eventId,
                                  UUID paymentId,
                                  UUID bookingId,
+                                 UUID passengerId,
                                  BigDecimal amount,
                                  String currency,
                                  Instant processedAt) {

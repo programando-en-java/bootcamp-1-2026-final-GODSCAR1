@@ -64,7 +64,14 @@ class CheckInJourneyE2ETest {
     private static final int HOURS_UNTIL_OPEN_DEPARTURE = 3;
     private static final int HOURS_UNTIL_DISTANT_DEPARTURE = 48;
 
-    private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(30);
+    /*
+     * Raised from 30s when notification-service joined the stack. Eleven
+     * containers share one machine, and a consumer group's first message also
+     * waits out Kafka's initial rebalance delay, so the saga can take longer to
+     * start than it does to run. The budget is a limit on patience, not a
+     * statement about how long settling should take.
+     */
+    private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration BETWEEN_POLLS = Duration.ofMillis(250);
 
     private static final String INSERT_FLIGHT = """

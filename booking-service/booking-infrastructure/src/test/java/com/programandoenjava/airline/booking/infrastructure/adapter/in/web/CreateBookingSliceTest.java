@@ -3,6 +3,7 @@ package com.programandoenjava.airline.booking.infrastructure.adapter.in.web;
 import com.jayway.jsonpath.JsonPath;
 import com.programandoenjava.airline.booking.EnableDatabaseTest;
 import com.programandoenjava.airline.booking.TestcontainersConfiguration;
+import com.programandoenjava.airline.booking.application.port.out.events.DomainEventPublisher;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsCommand;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.processedevents.ProcessedEventsPort;
@@ -13,6 +14,7 @@ import com.programandoenjava.airline.booking.domain.booking.SeatBlockId;
 import com.programandoenjava.airline.booking.domain.shared.Money;
 import com.programandoenjava.airline.booking.infrastructure.adapter.out.persistence.booking.BookingPersistenceConfiguration;
 import com.programandoenjava.airline.booking.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.booking.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
@@ -50,7 +52,8 @@ import java.util.UUID;
         BookingController.class,
         GlobalExceptionHandler.class,
         ApplicationConfiguration.class,
-        BookingPersistenceConfiguration.class
+        BookingPersistenceConfiguration.class,
+        TransactionSupportConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -110,6 +113,13 @@ class CreateBookingSliceTest {
 
     @MockitoBean
     private ReleaseSeatsPort releaseSeatsPort;
+
+    /*
+     * Announcing is its own concern and has its own test. What matters here is
+     * that nothing in this file changes when it arrives.
+     */
+    @MockitoBean
+    private DomainEventPublisher domainEventPublisher;
 
     @TestBean
     private Clock clock;

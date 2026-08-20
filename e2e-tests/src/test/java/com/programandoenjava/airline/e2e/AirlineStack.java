@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * The whole system, on a network of its own: a database per service, a broker,
- * and the four services, arranged the way the compose file arranges them.
+ * and the five services, arranged the way the compose file arranges them.
  *
  * <p>One Postgres container per service rather than one with a schema each,
  * because a service that cannot reach another's tables is the property being
@@ -36,6 +36,7 @@ final class AirlineStack {
     private static final String BOOKING_DB_ALIAS = "booking-db";
     private static final String PAYMENT_DB_ALIAS = "payment-db";
     private static final String CHECKIN_DB_ALIAS = "checkin-db";
+    private static final String NOTIFICATION_DB_ALIAS = "notification-db";
     private static final String KAFKA_ALIAS = "kafka";
     private static final String FLIGHT_ALIAS = "flight-service";
     private static final String BOOKING_ALIAS = "booking-service";
@@ -44,6 +45,7 @@ final class AirlineStack {
     private static final int BOOKING_PORT = 8082;
     private static final int PAYMENT_PORT = 8083;
     private static final int CHECKIN_PORT = 8084;
+    private static final int NOTIFICATION_PORT = 8085;
     private static final int POSTGRES_PORT = 5432;
 
     private static final String DATABASE_USER = "airline";
@@ -52,6 +54,7 @@ final class AirlineStack {
     private static final String BOOKING_DATABASE = "airline_booking";
     private static final String PAYMENT_DATABASE = "airline_payment";
     private static final String CHECKIN_DATABASE = "airline_checkin";
+    private static final String NOTIFICATION_DATABASE = "airline_notification";
 
     private static final Path REPOSITORY_ROOT = Path.of("..");
     private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
@@ -66,6 +69,8 @@ final class AirlineStack {
             database(PAYMENT_DB_ALIAS, PAYMENT_DATABASE);
     private static final PostgreSQLContainer CHECKIN_DB =
             database(CHECKIN_DB_ALIAS, CHECKIN_DATABASE);
+    private static final PostgreSQLContainer NOTIFICATION_DB =
+            database(NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE);
 
     /*
      * Reached only from inside the network, so no listener is advertised to the
@@ -79,12 +84,14 @@ final class AirlineStack {
     private static final GenericContainer<?> BOOKING_SERVICE;
     private static final GenericContainer<?> PAYMENT_SERVICE;
     private static final GenericContainer<?> CHECKIN_SERVICE;
+    private static final GenericContainer<?> NOTIFICATION_SERVICE;
 
     static {
         FLIGHT_DB.start();
         BOOKING_DB.start();
         PAYMENT_DB.start();
         CHECKIN_DB.start();
+        NOTIFICATION_DB.start();
         KAFKA.start();
 
         FLIGHT_SERVICE = flightService();
@@ -98,6 +105,9 @@ final class AirlineStack {
 
         CHECKIN_SERVICE = checkinService();
         CHECKIN_SERVICE.start();
+
+        NOTIFICATION_SERVICE = notificationService();
+        NOTIFICATION_SERVICE.start();
     }
 
     private AirlineStack() {
@@ -122,6 +132,10 @@ final class AirlineStack {
 
     static String checkinServiceUrl() {
         return urlOf(CHECKIN_SERVICE, CHECKIN_PORT);
+    }
+
+    static String notificationDatabaseUrl() {
+        return jdbcUrlOf(NOTIFICATION_DB, NOTIFICATION_DATABASE);
     }
 
     /**
@@ -206,6 +220,17 @@ final class AirlineStack {
      * Reads both of the services before it and writes nothing they read, so it
      * is last to start and nothing waits on it.
      */
+    /*
+     * Talks to nobody and nobody talks to it. It reads three topics and writes
+     * its own database, which is why it is last up and nothing waits on it.
+     */
+    private static GenericContainer<?> notificationService() {
+        return service("notification-service/notification-infrastructure", NOTIFICATION_PORT,
+                NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE)
+                .withEnv("SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork())
+                .dependsOn(NOTIFICATION_DB, KAFKA);
+    }
+
     private static GenericContainer<?> checkinService() {
         Map<String, String> environment = Map.of(
                 "AIRLINE_BOOKING-SERVICE_URL", "http://" + BOOKING_ALIAS + ":" + BOOKING_PORT,

@@ -8,6 +8,7 @@ import com.programandoenjava.airline.booking.application.port.in.readbooking.exc
 import com.programandoenjava.airline.booking.application.port.in.settlebooking.ConfirmBookingUseCase;
 import com.programandoenjava.airline.booking.application.port.in.settlebooking.FailBookingUseCase;
 import com.programandoenjava.airline.booking.application.port.in.settlebooking.SettleBookingCommand;
+import com.programandoenjava.airline.booking.application.port.out.events.DomainEventPublisher;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.SeatsHeld;
 import com.programandoenjava.airline.booking.application.port.out.releaseseats.ReleaseSeatsPort;
@@ -96,6 +97,13 @@ class SettleBookingSliceTest {
 
     @MockitoBean
     private ReleaseSeatsPort releaseSeatsPort;
+
+    /*
+     * Creating a booking is what announces one, and that is not what this file
+     * is about. The port is here so the wiring stands up, and nothing else.
+     */
+    @MockitoBean
+    private DomainEventPublisher domainEventPublisher;
 
     @TestBean
     private Clock clock;

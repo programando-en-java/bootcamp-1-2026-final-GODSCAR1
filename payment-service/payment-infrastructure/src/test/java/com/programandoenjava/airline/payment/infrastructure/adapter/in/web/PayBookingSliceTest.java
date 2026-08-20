@@ -8,6 +8,7 @@ import com.programandoenjava.airline.payment.application.port.out.readbooking.Bo
 import com.programandoenjava.airline.payment.application.port.out.readbooking.ReadBookingPort;
 import com.programandoenjava.airline.payment.application.port.out.readbooking.exception.BookingNotFoundException;
 import com.programandoenjava.airline.payment.domain.payment.BookingId;
+import com.programandoenjava.airline.payment.domain.payment.PassengerId;
 import com.programandoenjava.airline.payment.domain.shared.Money;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.gateway.GatewayConfiguration;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.persistence.payment.PaymentPersistenceConfiguration;
@@ -339,8 +340,9 @@ class PayBookingSliceTest {
 
     private void givenBookingIs(final UUID bookingId, final String status) {
         BookingId id = new BookingId(bookingId);
+        PassengerId passenger = new PassengerId(UUID.randomUUID());
         Money total = Money.of(TOTAL, COP);
-        BookingToPay booking = new BookingToPay(id, total, status);
+        BookingToPay booking = new BookingToPay(id, passenger, total, status);
 
         BDDMockito.given(readBookingPort.byId(BDDMockito.any())).willReturn(booking);
     }

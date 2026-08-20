@@ -23,6 +23,8 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [014](#adr-014-consuming-a-payment-event-once) | Accepted | Consuming a payment event once |
 | [015](#adr-015-a-boarding-pass-without-a-seat) | Accepted | A boarding pass without a seat |
 | [016](#adr-016-when-check-in-is-allowed) | Accepted | When check-in is allowed |
+| [017](#adr-017-what-a-notification-is-here) | Accepted | What a notification is here |
+| [018](#adr-018-carrying-the-passenger-in-a-payment-event) | Accepted | Carrying the passenger in a payment event |
 
 ---
 
@@ -102,10 +104,11 @@ it reads rows and sends `payload` to `topic` keyed by `aggregate_id`. Keying by
 aggregate id routes all events for one aggregate to the same partition, which
 preserves per-aggregate ordering.
 
-`payment` and `checkin` own an outbox. `booking` was expected to and does not:
-everything it would announce, another service already knows, and it consumes
-rather than publishes. `flight` only responds to commands, and `auth` and
-`notification` publish nothing.
+`payment`, `checkin` and `booking` own an outbox. The claim that `booking`
+would never need one was wrong, and EPIC-05 is where it broke: a booking having
+been made is something only `booking` can say, and notifying a passenger about
+it is the first thing that had to hear it. `flight` only responds to commands,
+and `auth` and `notification` publish nothing.
 
 ### Consequences
 
@@ -1125,3 +1128,114 @@ departure precisely in order to explain why it is refusing.
 - **Nobody checks whose booking it is.** The booking id is enough to check in,
   which is the same gap bookings and payments already have, and it closes when
   there is an auth-service to close it.
+
+---
+
+## ADR-017: What a notification is here
+
+**Status:** Accepted
+
+### Context
+
+EPIC-05 asks that a passenger be told when they book, when they pay and when
+they check in. Nothing in this system can tell anyone anything: no service holds
+an email address, a phone number or a name. `PassengerId` is a uuid and that is
+all there has ever been, because there is no auth-service.
+
+So "the user receives a notification" had to be given a meaning that is
+honest rather than one that looks finished.
+
+### Decision
+
+**A channel port with an adapter that writes a log line.** The port is what a
+real provider would replace; the adapter is what this system can actually do.
+The same shape as the payment gateway: a seam that is simulated on purpose, not
+a stub that pretends.
+
+**Every send is recorded in `notifications`**, with `sent_at` null until the
+channel has taken it. There is no read endpoint: this is the record of a send,
+not an inbox, and no story asks for one.
+
+**Written first, sent second, marked third.** A crash between the write and the
+send leaves a notification nobody received, which the partial index over
+`sent_at IS NULL` makes findable. The other order would send one and forget it
+had, and the passenger would get it again on the next delivery.
+
+**Every consumer claims the event id before doing anything** (ADR-014). This
+matters more here than anywhere else in the system: confirming a booking twice
+is the same booking, and notifying a passenger twice is the thing they notice.
+
+**Three modules, like every other service.** The domain is thin, but the wording
+lives in it and is tested without a broker, which is the part of this service
+anyone would ever read.
+
+### Consequences
+
+- **Nobody is actually told anything.** A log line is not a notification, and
+  the day this system has contact details it will need a real adapter and a
+  retry policy that goes with it.
+- **Nothing sweeps the unsent.** The index exists, the job does not. A channel
+  that throws leaves a row that stays unsent until somebody looks.
+- **The channel is called outside the transaction**, so a provider that hangs
+  cannot hold a database connection open. The cost is the window above.
+- **`processed_events` is never purged**, the same gap booking-service has.
+- **A booking notification cannot name the flight.** booking-service holds seats
+  by id and never learns the flight number, so the message names the booking and
+  the total instead. Only the check-in message can say which aeroplane.
+
+---
+
+## ADR-018: Carrying the passenger in a payment event
+
+**Status:** Accepted
+
+### Context
+
+`payment.succeeded.v1` carried the payment, the booking and the amount, and no
+passenger. payment-service did not even know who the passenger was: it reads the
+booking to find out what is owed and discarded every other field.
+
+To notify anyone about a payment, something had to supply the passenger. Three
+ways were considered.
+
+**notification-service reads booking-service over HTTP** when a payment message
+arrives. Rejected: a synchronous call inside the consumption of a message means
+that when booking-service is down the consumer either blocks its partition
+retrying or drops the notification, and it would need Feign and a resilience
+configuration to do it.
+
+**notification-service remembers who a booking belongs to** from
+`booking.created.v1`, which it consumes anyway. Rejected, and this is the
+interesting one: the two are different topics, and Kafka orders messages within
+a partition, not across topics. In production minutes pass between booking and
+paying, so it would almost always work. In the end-to-end test milliseconds
+pass. A failure that only appears when things are fast is the kind that appears
+in a demonstration.
+
+### Decision
+
+**The event carries the passenger.** `BookingToPay` keeps the `passengerId` that
+booking-service already returns, `PayBookingService` hands it to the recorder,
+and `PaymentSettled` carries it to the listener that writes the outbox row.
+
+**`Payment` does not store it.** No column, no migration, no field. A payment is
+money, and whose booking it settles is booking-service's business. The passenger
+travels beside the payment inside the in-process event, because an announcement
+is addressed to someone even when the thing being announced is not.
+
+**Both payment events get it**, not just the successful one. Nobody notifies on
+a refusal today, and building the two contracts differently would be a
+difference with no reason behind it.
+
+### Consequences
+
+- **The contract stayed at v1.** Adding a field does not break a consumer that
+  ignores what it does not know, and booking-service's copy of this event
+  declares two fields and says so in its own javadoc. A rename or a removal
+  would need v2.
+- **A payment message now names a passenger**, which is one more place a
+  passenger identifier exists. With real personal data rather than a uuid that
+  would be worth weighing; with a uuid it is not.
+- **payment-service reads a field it does not use itself.** If booking-service
+  ever stops returning it, payment breaks for a reason that has nothing to do
+  with payments.

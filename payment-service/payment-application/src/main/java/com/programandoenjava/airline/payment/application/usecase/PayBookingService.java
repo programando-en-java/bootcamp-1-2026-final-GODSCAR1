@@ -59,7 +59,7 @@ public class PayBookingService implements PayBookingUseCase {
                 ? Payment.succeeded(id, command.bookingId(), amount, command.card(), now)
                 : Payment.failed(id, command.bookingId(), amount, command.card(), now);
 
-        recorder.record(payment);
+        recorder.record(payment, booking.passengerId());
 
         return payment;
     }

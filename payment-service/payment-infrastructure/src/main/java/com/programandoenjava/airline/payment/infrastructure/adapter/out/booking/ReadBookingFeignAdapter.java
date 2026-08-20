@@ -4,6 +4,7 @@ import com.programandoenjava.airline.payment.application.port.out.readbooking.Bo
 import com.programandoenjava.airline.payment.application.port.out.readbooking.ReadBookingPort;
 import com.programandoenjava.airline.payment.application.port.out.readbooking.exception.BookingNotFoundException;
 import com.programandoenjava.airline.payment.domain.payment.BookingId;
+import com.programandoenjava.airline.payment.domain.payment.PassengerId;
 import com.programandoenjava.airline.payment.domain.shared.Money;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.booking.dto.BookingResponse;
 import feign.FeignException;
@@ -30,8 +31,9 @@ class ReadBookingFeignAdapter implements ReadBookingPort {
 
         Currency currency = Currency.getInstance(response.currency());
         Money total = new Money(response.total(), currency);
+        PassengerId passenger = new PassengerId(response.passengerId());
 
-        return new BookingToPay(bookingId, total, response.status());
+        return new BookingToPay(bookingId, passenger, total, response.status());
     }
 
     /*

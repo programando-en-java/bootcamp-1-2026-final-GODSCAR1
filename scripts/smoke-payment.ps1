@@ -9,6 +9,9 @@
 # Pass -Decline to use the card the gateway refuses, which is the US-006 path:
 # the booking should end up FAILED and the seats should go back on the flight.
 
+# CmdletBinding, so PowerShell refuses a switch this script does not have
+# instead of putting it in $args and running the wrong path in silence.
+[CmdletBinding()]
 param(
     [switch]$Decline
 )
@@ -39,9 +42,32 @@ function Query($container, $database, $sql) {
     return (docker exec $container psql -U airline -d $database -tAc $sql).Trim()
 }
 
+# A failed docker exec sets $LASTEXITCODE and carries on: ErrorActionPreference
+# does not cover a native command's exit code. Without this the script announces
+# a flight it never created and only falls over at the first HTTP call.
+function RequireStack($containers) {
+    foreach ($name in $containers) {
+        $state = docker inspect --format "{{.State.Running}}" $name 2>$null
+
+        if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
+            throw "The stack is not up: $name is not running. Start it with: docker compose up -d --build --wait"
+        }
+    }
+}
+
+function Exec($container, $database, $sql) {
+    docker exec $container psql -U airline -d $database -c $sql | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not run a statement against $database on $container"
+    }
+}
+
 # --- a flight to book -------------------------------------------------------
 # There is no API for creating one, and a running instance starts with an empty
 # catalogue, so it goes straight into flight-service's own database.
+
+RequireStack @($flightDb, $bookingDb, $kafka)
 
 Step "Creating a flight"
 
@@ -58,7 +84,7 @@ VALUES ('$flightId', 'SM$suffix', 'BOG', 'MDE',
         '$departure', '$arrival', $capacity, $capacity, 250000.00, 'COP');
 "@
 
-docker exec $flightDb psql -U airline -d airline_flight -c $insert | Out-Null
+Exec $flightDb "airline_flight" $insert
 Write-Host "flight   $flightId (SM$suffix), $capacity seats"
 
 # --- a booking --------------------------------------------------------------

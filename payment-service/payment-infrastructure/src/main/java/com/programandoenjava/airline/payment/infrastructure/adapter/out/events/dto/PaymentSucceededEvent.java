@@ -15,6 +15,7 @@ import java.util.UUID;
 public record PaymentSucceededEvent(UUID eventId,
                                     UUID paymentId,
                                     UUID bookingId,
+                                    UUID passengerId,
                                     BigDecimal amount,
                                     String currency,
                                     Instant processedAt) {

@@ -74,6 +74,23 @@ services:
       timeout: 5s
       retries: 5
 
+  notification-db:
+    image: postgres:17-alpine
+    container_name: airline-notification-db
+    environment:
+      POSTGRES_USER: airline
+      POSTGRES_PASSWORD: airline
+      POSTGRES_DB: airline_notification
+    ports:
+      - "5437:5432"
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airline -d airline_notification" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   kafka:
     image: apache/kafka:4.1.0
     container_name: airline-kafka
@@ -179,10 +196,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://checkin-db:5432/airline_checkin
       AIRLINE_BOOKING-SERVICE_URL: http://booking-service:8082
       AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
     ports:
       - "8084:8084"
     depends_on:
       checkin-db:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       booking-service:
         condition: service_healthy
@@ -194,9 +214,29 @@ services:
       timeout: 5s
       retries: 10
 
+  notification-service:
+    build: ./notification-service/notification-infrastructure
+    container_name: airline-notification
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://notification-db:5432/airline_notification
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8085:8085"
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8085/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   flight-db-data:
   booking-db-data:
   payment-db-data:
   checkin-db-data:
+  notification-db-data:
   kafka-data:
