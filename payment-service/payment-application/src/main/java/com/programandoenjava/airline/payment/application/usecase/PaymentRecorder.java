@@ -4,6 +4,7 @@ import com.programandoenjava.airline.payment.application.event.PaymentSettled;
 import com.programandoenjava.airline.payment.application.port.out.events.DomainEventPublisher;
 import com.programandoenjava.airline.payment.application.port.out.savepayment.SavePaymentPort;
 import com.programandoenjava.airline.payment.application.transaction.UnitOfWork;
+import com.programandoenjava.airline.payment.domain.payment.PassengerId;
 import com.programandoenjava.airline.payment.domain.payment.Payment;
 
 /**
@@ -29,8 +30,8 @@ public class PaymentRecorder {
     }
 
     @UnitOfWork
-    public void record(final Payment payment) {
+    public void record(final Payment payment, final PassengerId passengerId) {
         savePayment.save(payment);
-        events.publish(new PaymentSettled(payment));
+        events.publish(new PaymentSettled(payment, passengerId));
     }
 }

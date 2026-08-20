@@ -58,7 +58,13 @@ class PaymentJourneyE2ETest {
     private static final String FAILED = "FAILED";
     private static final String SUCCEEDED = "SUCCEEDED";
 
-    private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(30);
+    /*
+     * Sixty seconds since notification-service joined the stack. Eleven
+     * containers share one machine, and a consumer group's first message also
+     * waits out Kafka's initial rebalance delay. The budget is a limit on
+     * patience, not a statement about how long this should take.
+     */
+    private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration BETWEEN_POLLS = Duration.ofMillis(250);
 
     private static final String INSERT_FLIGHT = """

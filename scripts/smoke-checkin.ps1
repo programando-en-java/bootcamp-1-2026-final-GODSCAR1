@@ -9,6 +9,9 @@
 # Pass -TooEarly to put the flight two days out, which is the US-008 path: the
 # window has not opened and no pass is printed.
 
+# CmdletBinding, so PowerShell refuses a switch this script does not have
+# instead of putting it in $args and running the wrong path in silence.
+[CmdletBinding()]
 param(
     [switch]$TooEarly
 )
@@ -39,9 +42,53 @@ function Query($container, $database, $sql) {
     return (docker exec $container psql -U airline -d $database -tAc $sql).Trim()
 }
 
+# A failed docker exec sets $LASTEXITCODE and carries on: ErrorActionPreference
+# does not cover a native command's exit code. Without this the script announces
+# a flight it never created and only falls over at the first HTTP call.
+function RequireStack($containers) {
+    foreach ($name in $containers) {
+        $state = docker inspect --format "{{.State.Running}}" $name 2>$null
+
+        if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
+            throw "The stack is not up: $name is not running. Start it with: docker compose up -d --build --wait"
+        }
+    }
+}
+
+function Exec($container, $database, $sql) {
+    docker exec $container psql -U airline -d $database -c $sql | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not run a statement against $database on $container"
+    }
+}
+
+# The ProblemDetail behind a 4xx. Invoke-RestMethod throws, and where the body
+# ends up depends on the edition: PowerShell 7 puts it in ErrorDetails, Windows
+# PowerShell 5.1 leaves it on the response stream. This looks in both, which is
+# why US-008's reason is readable here rather than blank.
+function ProblemFrom($failure) {
+    $body = $failure.ErrorDetails.Message
+
+    if (-not $body) {
+        $response = $failure.Exception.Response
+
+        if ($response -and $response.PSObject.Methods.Name -contains "GetResponseStream") {
+            $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+            try { $body = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        }
+    }
+
+    if (-not $body) { return $null }
+
+    try { return $body | ConvertFrom-Json } catch { return $null }
+}
+
 # --- a flight leaving soon --------------------------------------------------
 # Three hours out by default, which is inside the window: check-in opens a day
 # before departure and closes an hour before it.
+
+RequireStack @($flightDb, $bookingDb, $checkinDb, $kafka)
 
 Step "Creating a flight that leaves in $hoursAhead hours"
 
@@ -58,7 +105,7 @@ VALUES ('$flightId', 'SM$suffix', 'BOG', 'MDE',
         '$departure', '$arrival', $capacity, $capacity, 250000.00, 'COP');
 "@
 
-docker exec $flightDb psql -U airline -d airline_flight -c $insert | Out-Null
+Exec $flightDb "airline_flight" $insert
 Write-Host "flight   $flightId (SM$suffix)"
 Write-Host "departs  $departure"
 
@@ -122,8 +169,15 @@ try {
     Write-Host "boarding $($pass.boardingSequence)" -ForegroundColor Yellow
     $refused = $null
 } catch {
-    $refused = $_.ErrorDetails.Message
-    Write-Host "refused  $refused" -ForegroundColor Yellow
+    $refused = ProblemFrom $_
+
+    if ($refused) {
+        Write-Host "refused  $($refused.title)" -ForegroundColor Yellow
+        Write-Host "reason   $($refused.detail)"
+        Write-Host "type     $($refused.type)"
+    } else {
+        Write-Host "refused  $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 # --- checking in twice ------------------------------------------------------
@@ -151,8 +205,18 @@ $passes = Query $checkinDb "airline_checkin" `
     "SELECT count(*) FROM boarding_passes WHERE booking_id = '$($booking.bookingId)'"
 $messages = Query $checkinDb "airline_checkin" `
     "SELECT count(*) FROM outbox WHERE aggregate_id = '$($booking.bookingId)'"
-$unsent = Query $checkinDb "airline_checkin" `
-    "SELECT count(*) FROM outbox WHERE aggregate_id = '$($booking.bookingId)' AND published_at IS NULL"
+
+# The relay sweeps on a timer, so the row is written before it is sent and asking
+# right away reads a message that has not gone out yet. This waits for the sweep
+# rather than reporting a race as a failure.
+$deadline = (Get-Date).AddSeconds(15)
+$unsent = "1"
+
+while ((Get-Date) -lt $deadline -and $unsent -ne "0") {
+    Start-Sleep -Milliseconds 500
+    $unsent = Query $checkinDb "airline_checkin" `
+        "SELECT count(*) FROM outbox WHERE aggregate_id = '$($booking.bookingId)' AND published_at IS NULL"
+}
 
 Write-Host "passes   $passes"
 Write-Host "messages $messages"

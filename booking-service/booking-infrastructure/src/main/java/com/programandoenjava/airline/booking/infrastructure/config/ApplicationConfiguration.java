@@ -6,9 +6,11 @@ import com.programandoenjava.airline.booking.application.port.in.settlebooking.C
 import com.programandoenjava.airline.booking.application.port.in.settlebooking.FailBookingUseCase;
 import com.programandoenjava.airline.booking.application.port.out.findbooking.FindBookingPort;
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
+import com.programandoenjava.airline.booking.application.port.out.events.DomainEventPublisher;
 import com.programandoenjava.airline.booking.application.port.out.processedevents.ProcessedEventsPort;
 import com.programandoenjava.airline.booking.application.port.out.releaseseats.ReleaseSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
+import com.programandoenjava.airline.booking.application.usecase.BookingRecorder;
 import com.programandoenjava.airline.booking.application.usecase.ConfirmBookingService;
 import com.programandoenjava.airline.booking.application.usecase.CreateBookingService;
 import com.programandoenjava.airline.booking.application.usecase.FailBookingService;
@@ -27,11 +29,17 @@ public class ApplicationConfiguration {
     }
 
     @Bean
+    BookingRecorder bookingRecorder(final SaveBookingPort saveBookingPort,
+                                    final DomainEventPublisher domainEventPublisher) {
+        return new BookingRecorder(saveBookingPort, domainEventPublisher);
+    }
+
+    @Bean
     CreateBookingUseCase createBookingUseCase(final FindBookingPort findBookingPort,
                                               final HoldSeatsPort holdSeatsPort,
-                                              final SaveBookingPort saveBookingPort,
+                                              final BookingRecorder bookingRecorder,
                                               final Clock clock) {
-        return new CreateBookingService(findBookingPort, holdSeatsPort, saveBookingPort, clock);
+        return new CreateBookingService(findBookingPort, holdSeatsPort, bookingRecorder, clock);
     }
 
     @Bean

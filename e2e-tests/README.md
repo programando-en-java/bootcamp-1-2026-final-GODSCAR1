@@ -1,7 +1,7 @@
 # End-to-end tests
 
 The stack is brought up by the tests themselves: a database per service, a
-broker and the four services, built from the same Dockerfiles the compose file
+broker and the five services, built from the same Dockerfiles the compose file
 uses.
 
 ```
@@ -33,6 +33,13 @@ Settling is asynchronous, so those assertions poll rather than checking once.
 booking-service answers with a status check-in understands, and flight-service
 answers with a departure it can measure its window against, is shown here alone.
 The window is also the reason those flights depart in hours rather than days.
+
+**Notifications.** Three services announce three things on three topics and
+notification-service reads all of them. Nothing calls it, so there is no other
+way to find out whether what those services publish is what it expects. Every
+assertion there polls: a notification exists once a relay has swept, the broker
+has delivered and the consumer has run, none of which has happened by the time
+the request that caused it has answered.
 
 ## Flights
 

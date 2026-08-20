@@ -17,6 +17,7 @@
         <module>booking-service</module>
         <module>payment-service</module>
         <module>checkin-service</module>
+        <module>notification-service</module>
         <module>e2e-tests</module>
     </modules>
 

@@ -9,6 +9,7 @@ import com.programandoenjava.airline.payment.application.port.out.savepayment.Sa
 import com.programandoenjava.airline.payment.application.port.out.readbooking.BookingToPay;
 import com.programandoenjava.airline.payment.application.port.out.readbooking.ReadBookingPort;
 import com.programandoenjava.airline.payment.domain.payment.BookingId;
+import com.programandoenjava.airline.payment.domain.payment.PassengerId;
 import com.programandoenjava.airline.payment.domain.payment.CardNumber;
 import com.programandoenjava.airline.payment.domain.shared.Money;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.gateway.GatewayConfiguration;
@@ -208,6 +209,45 @@ class PaymentOutboxSliceTest {
         }
 
         /*
+         * Added for the notification epic. Without it a payment message could
+         * not be turned into anything addressed to anyone, and the only ways
+         * round that were a second call to booking-service or waiting on a
+         * message from a different topic with no ordering between them.
+         */
+        @Test
+        @DisplayName("should name the passenger whose booking was charged")
+        void shouldNameThePassengerWhoseBookingWasCharged() {
+            UUID booking = aBooking();
+            UUID passenger = UUID.randomUUID();
+            givenBookingBelongsTo(booking, passenger);
+
+            pay(booking, GOOD_CARD);
+
+            String named = JsonPath.read(payloadOfTheOnlyMessage(), "$.passengerId");
+
+            Assertions.assertThat(named).isEqualTo(passenger.toString());
+        }
+
+        /*
+         * A refused payment says who it was for as well. Nobody notifies on one
+         * yet, and building the two contracts differently would be a difference
+         * with no reason behind it.
+         */
+        @Test
+        @DisplayName("should name the passenger on a refusal too")
+        void shouldNameThePassengerOnARefusalToo() {
+            UUID booking = aBooking();
+            UUID passenger = UUID.randomUUID();
+            givenBookingBelongsTo(booking, passenger);
+
+            pay(booking, DECLINING_CARD);
+
+            String named = JsonPath.read(payloadOfTheOnlyMessage(), "$.passengerId");
+
+            Assertions.assertThat(named).isEqualTo(passenger.toString());
+        }
+
+        /*
          * The integration event is flat and made of primitives, so nothing about
          * the card can reach it even by accident. This is the test that says so.
          */
@@ -261,9 +301,14 @@ class PaymentOutboxSliceTest {
     }
 
     private void givenBookingIsPayable(final UUID bookingId) {
+        givenBookingBelongsTo(bookingId, UUID.randomUUID());
+    }
+
+    private void givenBookingBelongsTo(final UUID bookingId, final UUID passengerId) {
         BookingId id = new BookingId(bookingId);
+        PassengerId passenger = new PassengerId(passengerId);
         Money total = Money.of(TOTAL, COP);
-        BookingToPay booking = new BookingToPay(id, total, PENDING);
+        BookingToPay booking = new BookingToPay(id, passenger, total, PENDING);
 
         BDDMockito.given(readBookingPort.byId(BDDMockito.any())).willReturn(booking);
     }
