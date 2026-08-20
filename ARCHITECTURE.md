@@ -21,6 +21,8 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [012](#adr-012-calling-flight-service) | Accepted | Calling flight-service |
 | [013](#adr-013-the-payment-saga) | Accepted | The payment saga |
 | [014](#adr-014-consuming-a-payment-event-once) | Accepted | Consuming a payment event once |
+| [015](#adr-015-a-boarding-pass-without-a-seat) | Accepted | A boarding pass without a seat |
+| [016](#adr-016-when-check-in-is-allowed) | Accepted | When check-in is allowed |
 
 ---
 
@@ -100,10 +102,10 @@ it reads rows and sends `payload` to `topic` keyed by `aggregate_id`. Keying by
 aggregate id routes all events for one aggregate to the same partition, which
 preserves per-aggregate ordering.
 
-Only `payment` owns an outbox today. `booking` was expected to and does not:
+`payment` and `checkin` own an outbox. `booking` was expected to and does not:
 everything it would announce, another service already knows, and it consumes
-rather than publishes. `checkin` will need one. `flight` only responds to
-commands, and `auth` and `notification` publish nothing.
+rather than publishes. `flight` only responds to commands, and `auth` and
+`notification` publish nothing.
 
 ### Consequences
 
@@ -1015,3 +1017,111 @@ the compensation completed is the saga's own bookkeeping.
   between claiming and finishing means the event is marked handled and the work
   is not done. Doing both in one transaction would fix that for the confirm
   path, and cannot for the fail path, whose second step is a network call.
+
+---
+
+## ADR-015: A boarding pass without a seat
+
+**Status:** Accepted
+
+### Context
+
+US-007 asks for a boarding pass. Every boarding pass anyone has held names a
+seat, and this system has none: `SeatInventory` is a total and a number
+available, and a seat block is a count against a flight. Nothing anywhere models
+the 12A.
+
+Three ways out were considered.
+
+**checkin-service assigns a seat from the flight's capacity.** Rejected. Seat
+inventory belongs to flight-service, which guards it with a lock (ADR-007). A
+second service inventing seat identity from a number it does not own is the
+split brain the bounded contexts exist to prevent, and there would be no way to
+reconcile it with the block flight-service is already holding.
+
+**flight-service starts modelling seats.** Correct for a real airline and larger
+than epics 2 and 3 together: a seat map per aircraft, a row per seat with a
+state, blocks changing from "two seats" to "these two seats", locking per seat,
+an endpoint for check-in to claim one, and a compensation that releases them.
+It would touch ADR-007, ADR-008 and the whole payment saga. No story asks for
+it: choosing a seat is a feature nobody requested.
+
+### Decision
+
+**Open seating. The pass carries a boarding sequence instead of a seat.**
+
+The sequence is one flight's boarding order, and it is a number this service
+owns: it knows how many passes it has issued for that flight, which is not true
+of anything about seats. A counter row per flight is read for update, so two
+passengers checking in at the same moment take turns rather than being handed
+the same place.
+
+**The pass keeps a copy of the flight, not a reference to it.** Flight number,
+route and departure are written into the row when the pass is printed. A
+boarding pass is a document: it records a moment, and showing it again must not
+depend on flight-service answering.
+
+### Consequences
+
+- **Nobody can choose where they sit**, and nothing here is a step toward it. If
+  seats are modelled later, the pass gains a field and check-in asks
+  flight-service for one; none of this has to be undone.
+- **The pass names a passenger by uuid**, because no service holds a name. There
+  is no auth-service, so `PassengerId` is all a booking carries, and a document
+  that cannot be matched to a person is a real limitation rather than a
+  simplification.
+- **A boarding number can be skipped.** If two requests for the same booking
+  arrive together, both take a place and only one pass is written. Nothing
+  boards by a number that has to be contiguous, and the alternative is a lock
+  held across every check-in on the flight.
+- **A rescheduled flight leaves a pass saying the old time.** Nothing tells
+  check-in that a departure moved, which is the cost of copying. The alternative
+  costs a call to flight-service on every read of a pass.
+
+---
+
+## ADR-016: When check-in is allowed
+
+**Status:** Accepted
+
+### Context
+
+US-008 says check-in must be refused when the booking is not valid, and that the
+passenger must be told what the problem is. The first half is a status: only a
+`CONFIRMED` booking can be checked in, which check-in learns by reading the
+booking the way payment-service does (ADR-013).
+
+The second half is time, and it is why flight-service grew a read endpoint. A
+system that lets someone check in for a flight three weeks out, or for one that
+left yesterday, is not doing the job the story describes.
+
+### Decision
+
+**A window expressed as two distances from departure**, opening 24 hours before
+and closing an hour before, both configurable. The rule is a domain value
+object; the two numbers are configuration, so an airline that opens check-in
+earlier changes a property rather than code.
+
+**Three refusals rather than one**, because they ask different things of the
+passenger: come back later, go to the desk, and the flight has gone. Each is a
+separate exception with its own problem type, which is what makes "the user is
+informed of the problem" mean something more than a 409.
+
+**`GET /api/v1/flights/{id}` answers for a departed flight**, unlike the search,
+which hides them because nobody can buy a seat on one. Check-in needs the
+departure precisely in order to explain why it is refusing.
+
+### Consequences
+
+- **checkin-service depends on two services synchronously.** Checking in is
+  impossible while either is down. Acceptable: there is nothing to print if the
+  booking cannot be read, and nothing to print on it if the flight cannot.
+- **The window is measured against the service's own clock**, so a passenger at
+  the boundary can be refused by a second. No airline promises otherwise.
+- **Nothing consumes `checkin.completed.v1` yet.** The outbox is written and the
+  relay sends it because notification-service is the next epic, and the row has
+  to share the transaction that printed the pass, which cannot be added
+  afterwards from outside.
+- **Nobody checks whose booking it is.** The booking id is enough to check in,
+  which is the same gap bookings and payments already have, and it closes when
+  there is an auth-service to close it.

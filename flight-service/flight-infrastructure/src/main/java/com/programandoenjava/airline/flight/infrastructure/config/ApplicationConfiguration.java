@@ -1,8 +1,10 @@
 package com.programandoenjava.airline.flight.infrastructure.config;
 
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsUseCase;
+import com.programandoenjava.airline.flight.application.port.in.readflight.ReadFlightUseCase;
 import com.programandoenjava.airline.flight.application.port.in.releaseseats.ReleaseSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.in.searchflights.SearchFlightsUseCase;
+import com.programandoenjava.airline.flight.application.port.out.flight.FindFlightPort;
 import com.programandoenjava.airline.flight.application.port.out.flight.LockFlightPort;
 import com.programandoenjava.airline.flight.application.port.out.flight.SaveFlightPort;
 import com.programandoenjava.airline.flight.application.port.out.searchflights.LoadFlightsPort;
@@ -10,6 +12,7 @@ import com.programandoenjava.airline.flight.application.port.out.seatblock.Delet
 import com.programandoenjava.airline.flight.application.port.out.seatblock.FindSeatBlockPort;
 import com.programandoenjava.airline.flight.application.port.out.seatblock.SaveSeatBlockPort;
 import com.programandoenjava.airline.flight.application.usecase.BlockSeatsService;
+import com.programandoenjava.airline.flight.application.usecase.ReadFlightService;
 import com.programandoenjava.airline.flight.application.usecase.ReleaseSeatsService;
 import com.programandoenjava.airline.flight.application.usecase.SearchFlightsService;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +32,11 @@ public class ApplicationConfiguration {
     SearchFlightsUseCase searchFlightsUseCase(final LoadFlightsPort loadFlightsPort,
                                               final Clock clock) {
         return new SearchFlightsService(loadFlightsPort, clock);
+    }
+
+    @Bean
+    ReadFlightUseCase readFlightUseCase(final FindFlightPort findFlightPort) {
+        return new ReadFlightService(findFlightPort);
     }
 
     @Bean

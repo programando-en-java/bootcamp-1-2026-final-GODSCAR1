@@ -13,10 +13,11 @@ import java.util.Map;
 
 /**
  * The whole system, on a network of its own: a database per service, a broker,
- * and the three services, arranged the way the compose file arranges them.
+ * and the four services, arranged the way the compose file arranges them.
  *
- * <p>Three Postgres containers rather than one with three schemas, because a
- * service that cannot reach another's tables is the property being relied on.
+ * <p>One Postgres container per service rather than one with a schema each,
+ * because a service that cannot reach another's tables is the property being
+ * relied on.
  *
  * <p>Started once and left running for every test in the module. Tearing it down
  * between classes would cost minutes, and the tests make their own flights
@@ -34,6 +35,7 @@ final class AirlineStack {
     private static final String FLIGHT_DB_ALIAS = "flight-db";
     private static final String BOOKING_DB_ALIAS = "booking-db";
     private static final String PAYMENT_DB_ALIAS = "payment-db";
+    private static final String CHECKIN_DB_ALIAS = "checkin-db";
     private static final String KAFKA_ALIAS = "kafka";
     private static final String FLIGHT_ALIAS = "flight-service";
     private static final String BOOKING_ALIAS = "booking-service";
@@ -41,6 +43,7 @@ final class AirlineStack {
     private static final int FLIGHT_PORT = 8081;
     private static final int BOOKING_PORT = 8082;
     private static final int PAYMENT_PORT = 8083;
+    private static final int CHECKIN_PORT = 8084;
     private static final int POSTGRES_PORT = 5432;
 
     private static final String DATABASE_USER = "airline";
@@ -48,6 +51,7 @@ final class AirlineStack {
     private static final String FLIGHT_DATABASE = "airline_flight";
     private static final String BOOKING_DATABASE = "airline_booking";
     private static final String PAYMENT_DATABASE = "airline_payment";
+    private static final String CHECKIN_DATABASE = "airline_checkin";
 
     private static final Path REPOSITORY_ROOT = Path.of("..");
     private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
@@ -60,6 +64,8 @@ final class AirlineStack {
             database(BOOKING_DB_ALIAS, BOOKING_DATABASE);
     private static final PostgreSQLContainer PAYMENT_DB =
             database(PAYMENT_DB_ALIAS, PAYMENT_DATABASE);
+    private static final PostgreSQLContainer CHECKIN_DB =
+            database(CHECKIN_DB_ALIAS, CHECKIN_DATABASE);
 
     /*
      * Reached only from inside the network, so no listener is advertised to the
@@ -72,11 +78,13 @@ final class AirlineStack {
     private static final GenericContainer<?> FLIGHT_SERVICE;
     private static final GenericContainer<?> BOOKING_SERVICE;
     private static final GenericContainer<?> PAYMENT_SERVICE;
+    private static final GenericContainer<?> CHECKIN_SERVICE;
 
     static {
         FLIGHT_DB.start();
         BOOKING_DB.start();
         PAYMENT_DB.start();
+        CHECKIN_DB.start();
         KAFKA.start();
 
         FLIGHT_SERVICE = flightService();
@@ -87,6 +95,9 @@ final class AirlineStack {
 
         PAYMENT_SERVICE = paymentService();
         PAYMENT_SERVICE.start();
+
+        CHECKIN_SERVICE = checkinService();
+        CHECKIN_SERVICE.start();
     }
 
     private AirlineStack() {
@@ -109,6 +120,10 @@ final class AirlineStack {
         return urlOf(PAYMENT_SERVICE, PAYMENT_PORT);
     }
 
+    static String checkinServiceUrl() {
+        return urlOf(CHECKIN_SERVICE, CHECKIN_PORT);
+    }
+
     /**
      * The databases as seen from the test, which is outside the network the
      * services share. Postgres answers on a port Docker picked, so these cannot
@@ -120,6 +135,10 @@ final class AirlineStack {
 
     static String bookingDatabaseUrl() {
         return jdbcUrlOf(BOOKING_DB, BOOKING_DATABASE);
+    }
+
+    static String checkinDatabaseUrl() {
+        return jdbcUrlOf(CHECKIN_DB, CHECKIN_DATABASE);
     }
 
     static String databaseUser() {
@@ -181,6 +200,22 @@ final class AirlineStack {
                 PAYMENT_DB_ALIAS, PAYMENT_DATABASE)
                 .withEnv(environment)
                 .dependsOn(PAYMENT_DB, KAFKA, BOOKING_SERVICE);
+    }
+
+    /*
+     * Reads both of the services before it and writes nothing they read, so it
+     * is last to start and nothing waits on it.
+     */
+    private static GenericContainer<?> checkinService() {
+        Map<String, String> environment = Map.of(
+                "AIRLINE_BOOKING-SERVICE_URL", "http://" + BOOKING_ALIAS + ":" + BOOKING_PORT,
+                "AIRLINE_FLIGHT-SERVICE_URL", "http://" + FLIGHT_ALIAS + ":" + FLIGHT_PORT,
+                "SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork());
+
+        return service("checkin-service/checkin-infrastructure", CHECKIN_PORT,
+                CHECKIN_DB_ALIAS, CHECKIN_DATABASE)
+                .withEnv(environment)
+                .dependsOn(CHECKIN_DB, KAFKA, BOOKING_SERVICE, FLIGHT_SERVICE);
     }
 
     /*

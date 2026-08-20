@@ -3,6 +3,7 @@ package com.programandoenjava.airline.flight.infrastructure.adapter.in.web;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsCommand;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.BlockSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.in.blockseats.SeatsHeld;
+import com.programandoenjava.airline.flight.application.port.in.readflight.ReadFlightUseCase;
 import com.programandoenjava.airline.flight.application.port.in.releaseseats.ReleaseSeatsCommand;
 import com.programandoenjava.airline.flight.application.port.in.releaseseats.ReleaseSeatsUseCase;
 import com.programandoenjava.airline.flight.application.port.shared.IdempotencyKey;
@@ -37,12 +38,16 @@ class FlightController {
 
     private final ReleaseSeatsUseCase releaseSeatsUseCase;
 
+    private final ReadFlightUseCase readFlightUseCase;
+
     FlightController(final SearchFlightsUseCase searchFlightsUseCase,
                      final BlockSeatsUseCase blockSeatsUseCase,
-                     final ReleaseSeatsUseCase releaseSeatsUseCase) {
+                     final ReleaseSeatsUseCase releaseSeatsUseCase,
+                     final ReadFlightUseCase readFlightUseCase) {
         this.searchFlightsUseCase = searchFlightsUseCase;
         this.blockSeatsUseCase = blockSeatsUseCase;
         this.releaseSeatsUseCase = releaseSeatsUseCase;
+        this.readFlightUseCase = readFlightUseCase;
     }
 
 
@@ -56,6 +61,20 @@ class FlightController {
         PageResult<Flight> flights = searchFlightsUseCase.search(query);
 
         return flights.map(FlightResponse::from);
+    }
+
+    /**
+     * Answers for a departed flight as readily as for a future one. The caller
+     * is checkin-service, which reads this to decide whether its window is
+     * open, and a flight it cannot read is one it cannot explain.
+     */
+    @GetMapping("/{flightId}")
+    FlightResponse byId(@PathVariable final UUID flightId) {
+        FlightId id = new FlightId(flightId);
+
+        Flight flight = readFlightUseCase.byId(id);
+
+        return FlightResponse.from(flight);
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.flight;
 
+import com.programandoenjava.airline.flight.application.port.out.flight.FindFlightPort;
 import com.programandoenjava.airline.flight.application.port.out.flight.LockFlightPort;
 import com.programandoenjava.airline.flight.application.port.out.flight.SaveFlightPort;
 import com.programandoenjava.airline.flight.application.port.shared.PageResult;
@@ -14,7 +15,8 @@ import org.springframework.data.jpa.domain.Specification;
 import java.util.List;
 import java.util.Optional;
 
-class FlightPersistenceAdapter implements LoadFlightsPort, LockFlightPort, SaveFlightPort {
+class FlightPersistenceAdapter
+        implements LoadFlightsPort, FindFlightPort, LockFlightPort, SaveFlightPort {
 
     private final FlightJpaRepository flightJpaRepository;
 
@@ -44,6 +46,12 @@ class FlightPersistenceAdapter implements LoadFlightsPort, LockFlightPort, SaveF
 
         return new PageResult<>(flights, page.getNumber(), page.getSize(),
                 page.getTotalElements());
+    }
+
+    @Override
+    public Optional<Flight> byId(final FlightId id) {
+        return flightJpaRepository.findById(id.value())
+                .map(FlightEntityMapper::toDomain);
     }
 
     @Override
