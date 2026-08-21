@@ -8,13 +8,6 @@ import com.tngtech.archunit.library.Architectures;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/**
- * Architecture rules for booking-service.
- *
- * <p>Duplicated from flight-service rather than shared (ADR-003), and not
- * identical: this service talks to another over HTTP, so it has a rule
- * flight-service has no use for.
- */
 @AnalyzeClasses(
         packages = "com.programandoenjava.airline.booking",
         importOptions = ImportOption.DoNotIncludeTests.class)
@@ -59,13 +52,6 @@ class HexagonalArchitectureTest {
                     "org.hibernate..")
             .as("booking-application must not depend on Spring or the persistence provider");
 
-    /**
-     * The rule flight-service does not need. A @FeignClient in the application
-     * layer would compile and work, and would make the use case depend on how
-     * the other service is reached rather than on what it is asked for.
-     * Resilience4j is banned for the same reason: retries and circuit breakers
-     * are properties of a network call, not of a use case.
-     */
     @ArchTest
     static final ArchRule theCallToFlightServiceStaysInTheAdapter = noClasses()
             .that().resideInAnyPackage(DOMAIN, APPLICATION)

@@ -26,12 +26,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 
-/*
- * Only the search window is asserted here. Everything else this class does is
- * moving fields into a DTO, and a test over that breaks on any refactor without
- * catching a single real defect.
- */
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Search flights")
 class SearchFlightsServiceTest {

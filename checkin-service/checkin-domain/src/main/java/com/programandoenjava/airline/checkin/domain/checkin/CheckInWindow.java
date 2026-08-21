@@ -8,15 +8,6 @@ import com.programandoenjava.airline.checkin.domain.shared.DomainValidationExcep
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * When check-in is allowed, expressed as two distances from departure. The
- * durations come from configuration, so the rule is here and the numbers are
- * not.
- *
- * <p>Three refusals rather than one, because they call for different things
- * from the passenger: come back later, go to the counter, and the flight has
- * gone.
- */
 public record CheckInWindow(Duration opensBefore, Duration closesBefore) {
 
     public CheckInWindow {
@@ -42,10 +33,6 @@ public record CheckInWindow(Duration opensBefore, Duration closesBefore) {
         return departure.minus(closesBefore);
     }
 
-    /**
-     * Departure is tested first. A flight that has left is also past its
-     * closing time, and the vaguer of the two answers is the less useful one.
-     */
     public void requireOpenAt(final Instant departure, final Instant now) {
         if (!now.isBefore(departure)) {
             throw new FlightDepartedException(

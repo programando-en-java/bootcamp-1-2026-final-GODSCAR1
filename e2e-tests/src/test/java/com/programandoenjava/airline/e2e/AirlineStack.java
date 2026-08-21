@@ -11,22 +11,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 
-/**
- * The whole system, on a network of its own: a database per service, a broker,
- * and the five services, arranged the way the compose file arranges them.
- *
- * <p>One Postgres container per service rather than one with a schema each,
- * because a service that cannot reach another's tables is the property being
- * relied on.
- *
- * <p>Started once and left running for every test in the module. Tearing it down
- * between classes would cost minutes, and the tests make their own flights
- * rather than sharing one catalogue.
- *
- * <p>Images are built from the same Dockerfiles the compose file uses, so what
- * runs here is what would be deployed. They copy a jar Maven has already built:
- * without a package first, these tests exercise the previous build.
- */
 final class AirlineStack {
 
     private static final String POSTGRES_IMAGE = "postgres:17-alpine";
@@ -72,10 +56,6 @@ final class AirlineStack {
     private static final PostgreSQLContainer NOTIFICATION_DB =
             database(NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE);
 
-    /*
-     * Reached only from inside the network, so no listener is advertised to the
-     * host: nothing outside the services needs to speak to it.
-     */
     private static final KafkaContainer KAFKA = new KafkaContainer(KAFKA_IMAGE)
             .withNetwork(NETWORK)
             .withNetworkAliases(KAFKA_ALIAS);
@@ -113,13 +93,7 @@ final class AirlineStack {
     private AirlineStack() {
     }
 
-    /**
-     * Touching any member runs the static initialiser, which is what starts the
-     * stack. Called once from a test's setup rather than relied upon by
-     * accident.
-     */
     static void start() {
-        // The class loading did the work.
     }
 
     static String bookingServiceUrl() {
@@ -138,11 +112,6 @@ final class AirlineStack {
         return jdbcUrlOf(NOTIFICATION_DB, NOTIFICATION_DATABASE);
     }
 
-    /**
-     * The databases as seen from the test, which is outside the network the
-     * services share. Postgres answers on a port Docker picked, so these cannot
-     * be constants.
-     */
     static String flightDatabaseUrl() {
         return jdbcUrlOf(FLIGHT_DB, FLIGHT_DATABASE);
     }
@@ -216,14 +185,6 @@ final class AirlineStack {
                 .dependsOn(PAYMENT_DB, KAFKA, BOOKING_SERVICE);
     }
 
-    /*
-     * Reads both of the services before it and writes nothing they read, so it
-     * is last to start and nothing waits on it.
-     */
-    /*
-     * Talks to nobody and nobody talks to it. It reads three topics and writes
-     * its own database, which is why it is last up and nothing waits on it.
-     */
     private static GenericContainer<?> notificationService() {
         return service("notification-service/notification-infrastructure", NOTIFICATION_PORT,
                 NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE)
@@ -243,11 +204,6 @@ final class AirlineStack {
                 .dependsOn(CHECKIN_DB, KAFKA, BOOKING_SERVICE, FLIGHT_SERVICE);
     }
 
-    /*
-     * The alias and the port the broker listens on inside the network, not the
-     * one Testcontainers maps for the host: the services are on the network and
-     * the mapped port would not reach it from there.
-     */
     private static String brokerInsideTheNetwork() {
         return KAFKA_ALIAS + ":9093";
     }

@@ -8,14 +8,6 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Seats held for a booking, as a row.
- *
- * <p>The flight is referenced by id rather than by association. A hold belongs
- * to a different aggregate than the flight (ADR-008), and a {@code @ManyToOne}
- * would invite loading one through the other, which is the coupling keeping them
- * apart is meant to avoid.
- */
 @Entity
 @Table(name = "seat_blocks")
 class SeatBlockEntity {
@@ -39,7 +31,6 @@ class SeatBlockEntity {
     private Instant blockedAt;
 
     protected SeatBlockEntity() {
-        // required by JPA
     }
 
     SeatBlockEntity(final UUID id, final UUID flightId, final UUID bookingId, final int seats,

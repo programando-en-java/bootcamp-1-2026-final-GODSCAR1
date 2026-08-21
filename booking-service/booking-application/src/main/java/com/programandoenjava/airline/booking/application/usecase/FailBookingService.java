@@ -12,16 +12,6 @@ import com.programandoenjava.airline.booking.domain.booking.Booking;
 import java.time.Clock;
 import java.time.Instant;
 
-/*
- * Two steps that must not share a transaction. Marking the booking failed is a
- * local write; giving the seats back is an HTTP call, and when it throws the
- * booking stays FAILED with seats_released_at unset, which is what a sweep
- * would look for.
- *
- * The order matters. Marking first means a crash leaves seats held on a booking
- * that says it failed, which is recoverable. Releasing first would leave a
- * PENDING booking with no seats, which is not.
- */
 public class FailBookingService implements FailBookingUseCase {
 
     private final ProcessedEventsPort processedEvents;

@@ -48,11 +48,6 @@ public class BookingController {
         return BookingResponse.from(booking);
     }
 
-    /**
-     * Reads one booking. payment-service calls this to learn what is owed, so
-     * that an amount comes from the booking rather than from whoever is paying
-     * it (ADR-013).
-     */
     @GetMapping("/{bookingId}")
     BookingResponse byId(@PathVariable final UUID bookingId) {
         BookingId id = new BookingId(bookingId);

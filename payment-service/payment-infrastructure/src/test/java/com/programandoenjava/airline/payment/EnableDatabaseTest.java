@@ -14,11 +14,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * A slice that lists its own beans has auto-configuration off, so everything JPA
- * needs is asked for by name. Replace.NONE is what stops Boot swapping the
- * Testcontainers datasource for an embedded one.
- */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Documented

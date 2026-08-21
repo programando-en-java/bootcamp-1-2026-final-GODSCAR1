@@ -7,11 +7,6 @@ import jakarta.persistence.Table;
 
 import java.util.UUID;
 
-/**
- * One row per flight, holding the last place handed out. The row is what two
- * passengers checking in at the same moment take turns over: it is read for
- * update, so the second waits rather than being given the number the first has.
- */
 @Entity
 @Table(name = "boarding_sequences")
 class BoardingSequenceEntity {
@@ -24,10 +19,8 @@ class BoardingSequenceEntity {
     private int lastSequence;
 
     protected BoardingSequenceEntity() {
-        // required by JPA
     }
 
-    /** A flight nobody has checked in for yet, so nothing has been handed out. */
     BoardingSequenceEntity(final UUID flightId) {
         this.flightId = flightId;
         this.lastSequence = 0;

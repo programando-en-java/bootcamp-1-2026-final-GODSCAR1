@@ -17,23 +17,6 @@ import com.programandoenjava.airline.flight.domain.seatblock.SeatsBlocked;
 import java.util.Optional;
 import java.time.Clock;
 
-/**
- * Holds seats for a booking, once per request and once per booking.
- *
- * <p>The order of the steps is the whole design. Locking the flight first is
- * what makes the two checks below reliable rather than racy: a competing request
- * for the same flight waits at that line, so by the time it looks for an
- * existing hold the first request has either committed one or rolled back.
- *
- * <p>{@code @UnitOfWork} is what holds the lock from the read to the commit.
- * Without it every port call would open and close its own transaction, the lock
- * would be released the moment the flight was read, and two bookings could
- * oversell the same seats.
- *
- * <p>The price travels back with the block, taken from the flight that was
- * locked. A repeated request answers with the price on that same locked flight,
- * so a retry quotes what the original did unless the fare itself has moved.
- */
 public class BlockSeatsService implements BlockSeatsUseCase {
 
     private final LockFlightPort loadFlight;
@@ -54,16 +37,11 @@ public class BlockSeatsService implements BlockSeatsUseCase {
         this.clock = clock;
     }
 
-    /*
-     * Read committed on purpose, unlike the units of work that read to decide
-     * whether to write. The lock taken on the flight row is what orders two
-     * blocks on the same flight, and it orders them by making the second wait
-     * until it can see what the first wrote (ADR-007). Serialisable would abort
-     * that second one instead of letting it look, and a caller who should have
-     * been told its booking already holds seats would be told nothing useful.
-     */
     @Override
     @UnitOfWork
+    /* Read committed on purpose (ADR-019). The lock on the flight row orders the losers
+     * by making them wait until they can see what the winner wrote, which is how they
+     * answer 409. Serialisable aborts them instead. */
     public SeatsHeld block(final BlockSeatsCommand command) {
         Flight flight = loadFlight.byIdForUpdate(command.flightId())
                 .orElseThrow(() -> new FlightNotFoundException(command.flightId()));

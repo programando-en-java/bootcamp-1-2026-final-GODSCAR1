@@ -8,9 +8,6 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 
-/**
- * Translates a resolved search into Spring Data's vocabulary.
- */
 final class FlightQueryMapper {
 
     private FlightQueryMapper() {
@@ -43,12 +40,6 @@ final class FlightQueryMapper {
         return PageRequest.of(criteria.page(), criteria.size(), Sort.by(orders));
     }
 
-    /*
-     * The enum is what keeps an arbitrary property name from reaching Spring
-     * Data, where an unknown one is a 500 and a known one exposes a column that
-     * is not part of the public contract. No default branch: adding a value to
-     * SortableField makes this fail to compile until it is mapped.
-     */
     private static Sort.Order toOrder(final PageQuery.SortOrder sortOrder) {
         String property = switch (sortOrder.field()) {
             case DEPARTURE_TIME -> FlightEntity_.DEPARTURE_TIME;

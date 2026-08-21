@@ -10,9 +10,6 @@ import com.programandoenjava.airline.flight.domain.flight.SeatInventory;
 
 import java.util.Currency;
 
-/**
- * Turns persistence rows into domain aggregates.
- */
 final class FlightEntityMapper {
 
     private FlightEntityMapper() {

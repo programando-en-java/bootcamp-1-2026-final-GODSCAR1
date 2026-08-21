@@ -10,11 +10,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * The wording is here rather than in a listener, so this is where it can be
- * read back without a broker. What each message says matters: it is the only
- * part of this service a passenger would ever see.
- */
 @DisplayName("Notification")
 class NotificationTest {
 
@@ -47,11 +42,6 @@ class NotificationTest {
             Assertions.assertThat(notification.passengerId()).isEqualTo(passenger);
         }
 
-        /*
-         * Raised and sent are two different moments, and the gap between them
-         * is the one where a notification can be lost. A notification that
-         * claimed to be sent the instant it was written could not show that.
-         */
         @Test
         @DisplayName("should not claim to have been sent yet")
         void shouldNotClaimToHaveBeenSentYet() {
@@ -95,11 +85,6 @@ class NotificationTest {
             Assertions.assertThat(sent.sentAt()).isEqualTo(LATER);
         }
 
-        /*
-         * The trap this codebase keeps meeting: a record cannot mark itself, so
-         * a caller that drops the return value has done nothing at all and the
-         * compiler will not say so.
-         */
         @Test
         @DisplayName("should leave the original untouched")
         void shouldLeaveTheOriginalUntouched() {
@@ -139,11 +124,6 @@ class NotificationTest {
                     .contains(COP);
         }
 
-        /*
-         * A booking is PENDING when it is made, and telling someone it is
-         * confirmed before they have paid would be the worst kind of wrong: it
-         * reads as good news.
-         */
         @Test
         @DisplayName("should not call an unpaid booking confirmed")
         void shouldNotCallAnUnpaidBookingConfirmed() {
@@ -183,11 +163,6 @@ class NotificationTest {
     @DisplayName("what a check-in message says")
     class CheckInCompletedMessage {
 
-        /*
-         * The only one of the three that can name a flight. booking-service
-         * holds seats by id and never learns what the flight is called, so its
-         * message cannot say more than the booking.
-         */
         @Test
         @DisplayName("should name the flight and the route")
         void shouldNameTheFlightAndTheRoute() {

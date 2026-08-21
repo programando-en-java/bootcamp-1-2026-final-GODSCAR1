@@ -15,16 +15,8 @@ import com.programandoenjava.airline.checkin.domain.boardingpass.PassengerId;
 import java.time.Instant;
 import java.util.Optional;
 
-/**
- * The writes that belong together: taking a place in the boarding order,
- * printing the pass that carries it, and the outbox row the listener adds when
- * the event is published (ADR-001).
- *
- * <p>A class of its own rather than a method on CheckInService, because
- * {@code @UnitOfWork} is proxy-based and does nothing when a bean calls itself.
- * Keeping it here also keeps the transaction off the two network calls that
- * precede it.
- */
+/* A class of its own because @UnitOfWork is proxy-based and does nothing when a
+ * bean calls itself, and because it keeps the transaction off the two reads. */
 public class BoardingPassIssuer {
 
     private final NextBoardingSequencePort nextBoardingSequence;
@@ -39,12 +31,6 @@ public class BoardingPassIssuer {
         this.events = events;
     }
 
-    /*
-     * A number can be skipped: if two requests for the same booking arrive
-     * together, both take one and only one pass is written. Nothing boards by a
-     * number that has to be contiguous, and paying for that with a lock held
-     * across every check-in on the flight would be the worse trade.
-     */
     @UnitOfWork(isolation = Isolation.SERIALIZABLE)
     public BoardingPass issue(final BookingId bookingId,
                               final PassengerId passengerId,

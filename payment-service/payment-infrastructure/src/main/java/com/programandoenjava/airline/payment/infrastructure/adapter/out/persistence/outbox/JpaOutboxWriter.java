@@ -11,7 +11,6 @@ class JpaOutboxWriter implements OutboxWriter {
         this.outboxJpaRepository = outboxJpaRepository;
     }
 
-    /* No transaction of its own: it must join the one already open, not start one. */
     @Override
     public UUID write(final String aggregateType,
                       final String aggregateId,

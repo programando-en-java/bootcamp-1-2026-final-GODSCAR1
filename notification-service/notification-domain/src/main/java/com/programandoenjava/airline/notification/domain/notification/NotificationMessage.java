@@ -5,15 +5,6 @@ import com.programandoenjava.airline.notification.domain.shared.DomainValidation
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * The words a passenger would read. Composed here rather than in the adapter
- * that received the event, so the wording can be tested without a broker and
- * changing it does not mean touching a listener.
- *
- * <p>What each factory takes is what its event carries and no more, which is
- * why the check-in one names a flight and the others do not: booking-service
- * knows a flight only by id.
- */
 public record NotificationMessage(String subject, String body) {
 
     public NotificationMessage {

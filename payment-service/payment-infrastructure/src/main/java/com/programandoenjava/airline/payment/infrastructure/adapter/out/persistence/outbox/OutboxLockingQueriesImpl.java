@@ -9,19 +9,6 @@ import jakarta.persistence.criteria.Root;
 
 import java.util.List;
 
-/**
- * Written with the criteria API and the generated metamodel, so a renamed field
- * is a compilation error rather than a query that fails on the first sweep.
- *
- * <p>The lock mode and the hint are set on the query rather than declared with
- * {@code @Lock}: -2 is Hibernate's spelling of SKIP LOCKED, and there is
- * nowhere else to put it once the string is gone.
- *
- * <p>The entity manager arrives through {@code @PersistenceContext} rather
- * than the constructor, which is the one place in this codebase that does so.
- * Spring Data builds repository fragments itself, and this is the injection it
- * documents for them.
- */
 class OutboxLockingQueriesImpl implements OutboxLockingQueries {
 
     private static final String LOCK_TIMEOUT = "jakarta.persistence.lock.timeout";
@@ -31,6 +18,8 @@ class OutboxLockingQueriesImpl implements OutboxLockingQueries {
     private EntityManager entityManager;
 
     @Override
+    /* SKIP LOCKED is required, not an optimisation: without it two replicas select
+     * the same rows and every event goes out twice. */
     public List<OutboxEntity> claimPending(final int limit) {
         CriteriaBuilder builder = entityManager.getCriteriaBuilder();
         CriteriaQuery<OutboxEntity> query = builder.createQuery(OutboxEntity.class);

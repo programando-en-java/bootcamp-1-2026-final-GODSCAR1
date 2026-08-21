@@ -10,14 +10,6 @@ import jakarta.persistence.criteria.Root;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Written with the criteria API and the generated metamodel, so the attribute
- * this locks on is checked by the compiler.
- *
- * <p>The entity manager arrives through {@code @PersistenceContext} rather than
- * the constructor. Spring Data builds repository fragments itself, and this is
- * the injection it documents for them.
- */
 class BoardingSequenceLockingQueriesImpl implements BoardingSequenceLockingQueries {
 
     @PersistenceContext

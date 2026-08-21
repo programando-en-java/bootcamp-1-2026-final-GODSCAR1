@@ -15,18 +15,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 
-/*
- * Both halves of the epic are here. US-007 is the pass at the end; US-008 is
- * everything that can stop it: an unconfirmed booking, and a window that has
- * not opened, has closed, or belongs to a flight that has gone.
- *
- * The pass already issued is looked for first, before either network call. A
- * passenger who reloads the page is the common case, and it costs two requests
- * to two services to discover what one row already knows.
- *
- * No transaction here: reading the booking and the flight are network calls,
- * and the writes that must be atomic are behind BoardingPassIssuer.
- */
 public class CheckInService implements CheckInUseCase {
 
     private final FindBoardingPassPort findBoardingPass;

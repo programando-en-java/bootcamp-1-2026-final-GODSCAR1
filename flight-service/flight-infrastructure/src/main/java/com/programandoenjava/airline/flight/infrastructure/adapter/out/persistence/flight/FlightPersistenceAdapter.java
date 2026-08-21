@@ -26,11 +26,6 @@ class FlightPersistenceAdapter
 
     @Override
     public PageResult<Flight> search(final FlightSearchCriteria criteria) {
-        /*
-         * A window that cannot contain anything means the requested day is
-         * entirely in the past. Returning early avoids a query, and a COUNT,
-         * that can only come back empty.
-         */
         if (criteria.isEmptyWindow()) {
             return new PageResult<>(List.of(), criteria.page(), criteria.size(), 0);
         }

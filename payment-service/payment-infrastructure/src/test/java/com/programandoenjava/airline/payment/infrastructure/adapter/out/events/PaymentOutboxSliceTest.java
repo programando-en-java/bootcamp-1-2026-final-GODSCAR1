@@ -37,15 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * What the payment slice cannot say, because it mocks the publisher: that a
- * settled payment leaves a message behind, and that the message shares the
- * payment's transaction.
- *
- * <p>Kafka is absent on purpose. Sending is the relay's job and has its own
- * test; this one is about the row, which is what a crash after the charge would
- * otherwise lose.
- */
 @SpringBootTest(classes = {
         ApplicationConfiguration.class,
         GatewayConfiguration.class,
@@ -88,18 +79,9 @@ class PaymentOutboxSliceTest {
     @MockitoBean
     private ReadBookingPort readBookingPort;
 
-    /*
-     * A spy rather than a mock: the save has to work for most tests, and be made
-     * to fail for the one that checks the two writes share a transaction.
-     */
     @MockitoSpyBean
     private SavePaymentPort savePaymentPort;
 
-    /*
-     * The relay is a bean of OutboxConfiguration and cannot be built without a
-     * template. Nothing here calls it: sending is its own concern, with its own
-     * test, and what this one is about is the row the listener leaves behind.
-     */
     @MockitoBean
     private KafkaTemplate<String, String> kafkaTemplate;
 
@@ -129,10 +111,6 @@ class PaymentOutboxSliceTest {
             Assertions.assertThat(topicOfTheOnlyMessage()).isEqualTo(SUCCEEDED_TOPIC);
         }
 
-        /*
-         * A refusal is announced too. Without it the saga would never learn that
-         * the seats it is holding are not going to be paid for.
-         */
         @Test
         @DisplayName("should announce a refusal on the failed topic")
         void shouldAnnounceARefusalOnTheFailedTopic() {
@@ -144,10 +122,6 @@ class PaymentOutboxSliceTest {
             Assertions.assertThat(topicOfTheOnlyMessage()).isEqualTo(FAILED_TOPIC);
         }
 
-        /*
-         * Keying by booking is what puts every message about one booking on the
-         * same partition, and with it in order.
-         */
         @Test
         @DisplayName("should key the message by the booking it is about")
         void shouldKeyTheMessageByTheBookingItIsAbout() {
@@ -208,12 +182,6 @@ class PaymentOutboxSliceTest {
             Assertions.assertThat(currency).isEqualTo(COP);
         }
 
-        /*
-         * Added for the notification epic. Without it a payment message could
-         * not be turned into anything addressed to anyone, and the only ways
-         * round that were a second call to booking-service or waiting on a
-         * message from a different topic with no ordering between them.
-         */
         @Test
         @DisplayName("should name the passenger whose booking was charged")
         void shouldNameThePassengerWhoseBookingWasCharged() {
@@ -228,11 +196,6 @@ class PaymentOutboxSliceTest {
             Assertions.assertThat(named).isEqualTo(passenger.toString());
         }
 
-        /*
-         * A refused payment says who it was for as well. Nobody notifies on one
-         * yet, and building the two contracts differently would be a difference
-         * with no reason behind it.
-         */
         @Test
         @DisplayName("should name the passenger on a refusal too")
         void shouldNameThePassengerOnARefusalToo() {
@@ -247,10 +210,6 @@ class PaymentOutboxSliceTest {
             Assertions.assertThat(named).isEqualTo(passenger.toString());
         }
 
-        /*
-         * The integration event is flat and made of primitives, so nothing about
-         * the card can reach it even by accident. This is the test that says so.
-         */
         @Test
         @DisplayName("should carry nothing about the card")
         void shouldCarryNothingAboutTheCard() {
@@ -272,11 +231,6 @@ class PaymentOutboxSliceTest {
     @DisplayName("when the payment cannot be written")
     class Rollback {
 
-        /*
-         * The reason the listener runs BEFORE_COMMIT. If the two writes were in
-         * separate transactions, this would announce a charge that never
-         * happened — and nothing downstream could tell the difference.
-         */
         @Test
         @DisplayName("should announce nothing")
         void shouldAnnounceNothing() {

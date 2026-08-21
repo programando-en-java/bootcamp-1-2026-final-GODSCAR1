@@ -93,31 +93,15 @@ class CreateBookingSliceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /*
-     * flight-service is mocked on purpose. What this slice checks is what
-     * booking-service decides on its own: that one key yields one booking, and
-     * that a retry never reaches the port at all. Whether flight-service answers
-     * the way the adapter expects is a question for the end-to-end test, which
-     * is also the only place the Feign error decoder runs.
-     */
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
 
-    /*
-     * Present so the context can be built, and not otherwise used. Settling a
-     * booking arrives over Kafka and has its own path; this slice is about the
-     * endpoint that creates one.
-     */
     @MockitoBean
     private ProcessedEventsPort processedEventsPort;
 
     @MockitoBean
     private ReleaseSeatsPort releaseSeatsPort;
 
-    /*
-     * Announcing is its own concern and has its own test. What matters here is
-     * that nothing in this file changes when it arrives.
-     */
     @MockitoBean
     private DomainEventPublisher domainEventPublisher;
 
@@ -188,12 +172,6 @@ class CreateBookingSliceTest {
             Assertions.assertThat(asked.idempotencyKey().value()).isEqualTo(key);
         }
 
-        /*
-         * The key goes out as a field of its own rather than folded into the
-         * booking id. flight-service uses the two for different questions, and
-         * passing ours through is what makes a retry one request in their eyes
-         * as well as ours (ADR-011).
-         */
         @Test
         @DisplayName("should send the booking id and the key as separate things")
         void shouldSendTheBookingIdAndTheKeyAsSeparateThings() throws Exception {
@@ -247,10 +225,6 @@ class CreateBookingSliceTest {
             Assertions.assertThat(bookingCount()).isEqualTo(1);
         }
 
-        /*
-         * The one thing an end-to-end test cannot say without instrumenting
-         * flight-service: the retry never reached it.
-         */
         @Test
         @DisplayName("should not ask flight-service twice for a repeated request")
         void shouldNotAskFlightServiceTwiceForARepeatedRequest() throws Exception {
@@ -324,12 +298,6 @@ class CreateBookingSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.seats").value(SEATS_WANTED));
         }
 
-        /*
-         * The three fields payment-service reads. A booking that comes back
-         * owing a different amount than it was made for is how a passenger gets
-         * charged the wrong fare, and nothing between here and the end-to-end
-         * test would notice.
-         */
         @Test
         @DisplayName("should answer with what is owed and whether it is still owed")
         void shouldAnswerWithWhatIsOwedAndWhetherItIsStillOwed() throws Exception {
@@ -414,12 +382,6 @@ class CreateBookingSliceTest {
         }
     }
 
-    /*
-     * A different hold per call, because that is what flight-service does. A
-     * fixed one made the second booking collide with uq_bookings_seat_block,
-     * which is the index that stops two bookings claiming the same seats.
-     */
-    /** Makes a booking and hands back its id, which is what a read names. */
     private String makeABooking(final UUID passengerId, final UUID flightId) throws Exception {
         String body = mockMvc.perform(booking(passengerId, flightId, SEATS_WANTED, aKey()))
                 .andReturn().getResponse().getContentAsString();

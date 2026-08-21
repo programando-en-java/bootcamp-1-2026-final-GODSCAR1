@@ -44,7 +44,6 @@ class FlightEntity {
     private String priceCurrency;
 
     protected FlightEntity() {
-        // required by JPA
     }
 
     FlightEntity(final UUID id, final String flightNumber, final String origin, final String destination,

@@ -37,18 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * All three stories of EPIC-05, against a real database.
- *
- * <p>The channel is mocked because what it does today is write a log line, and
- * asserting on logs is the kind of test that breaks when someone rewords a
- * message. What is asserted instead is that the channel was handed the right
- * notification, and that the row says it went out.
- *
- * <p>Driven through the use case rather than through Kafka. Whether a listener
- * can deserialise what another service really sends is the end-to-end test's
- * question; this one is about what happens once it has.
- */
 @SpringBootTest(classes = {
         ApplicationConfiguration.class,
         NotificationPersistenceConfiguration.class,
@@ -157,11 +145,6 @@ class NotifyPassengerSliceTest {
                     .contains("500000.00");
         }
 
-        /*
-         * The passenger arrives in this message because payment.succeeded.v1
-         * was given a passengerId for this epic. Without it there would be
-         * nobody to address.
-         */
         @Test
         @DisplayName("should address it to the passenger the event named")
         void shouldAddressItToThePassengerTheEventNamed() {
@@ -217,11 +200,6 @@ class NotifyPassengerSliceTest {
             Assertions.assertThat(theOnlyNotification().get("sent_at")).isNotNull();
         }
 
-        /*
-         * Written first, sent second. If the channel throws, the row is still
-         * there with sent_at empty, and the partial index over those rows is
-         * what a sweep would use. Nothing sweeps yet, and that is the gap.
-         */
         @Test
         @DisplayName("should keep the notification when the channel fails")
         void shouldKeepTheNotificationWhenTheChannelFails() {
@@ -241,11 +219,6 @@ class NotifyPassengerSliceTest {
     @DisplayName("when the same message arrives again")
     class Redelivered {
 
-        /*
-         * The reason this service claims an event before doing anything. A
-         * booking confirmed twice is the same booking; a passenger notified
-         * twice is a passenger who noticed.
-         */
         @Test
         @DisplayName("should not notify the passenger a second time")
         void shouldNotNotifyThePassengerASecondTime() {

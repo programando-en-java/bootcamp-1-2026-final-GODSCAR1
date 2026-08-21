@@ -141,11 +141,6 @@ class FlightTest {
                     .hasMessageContaining("no longer open for booking");
         }
 
-        /*
-         * The message matters as much as the refusal: it is what tells the
-         * passenger how many seats they could have had. Guarding on departure
-         * alone rather than isBookable is what keeps it.
-         */
         @Test
         @DisplayName("should refuse more seats than are left, and say how many there were")
         void shouldRefuseMoreSeatsThanAreLeft() {
@@ -187,11 +182,6 @@ class FlightTest {
                 Money.of("250000.00", "COP"));
     }
 
-    /**
-     * A flight small enough that a single block can empty it. SeatCount caps a
-     * booking at nine seats, so the 120-seat flight above cannot be sold out in
-     * one call.
-     */
     private static Flight twoSeatsLeft() {
         return Flight.schedule(
                 new FlightNumber("AV102"),

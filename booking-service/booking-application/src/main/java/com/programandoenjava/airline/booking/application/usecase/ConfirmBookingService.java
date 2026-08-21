@@ -8,11 +8,6 @@ import com.programandoenjava.airline.booking.application.port.out.processedevent
 import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
 
-/*
- * Claiming the event first is what makes a redelivery cost nothing. The domain
- * tolerates a second confirmation anyway, but the claim covers the work around
- * it too, and says plainly that this message has been dealt with.
- */
 public class ConfirmBookingService implements ConfirmBookingUseCase {
 
     private final ProcessedEventsPort processedEvents;

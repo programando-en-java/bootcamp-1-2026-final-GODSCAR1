@@ -15,11 +15,6 @@ public class TestcontainersConfiguration {
         return new PostgreSQLContainer("postgres:17-alpine");
     }
 
-    /*
-     * The relay is a scheduled bean that starts with the application, so a
-     * context that has one needs a broker to point it at. @ServiceConnection
-     * sets bootstrap-servers to whatever port Docker picked.
-     */
     @Bean
     @ServiceConnection
     KafkaContainer kafkaContainer() {

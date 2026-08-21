@@ -48,12 +48,10 @@ class BookingPersistenceAdapter implements FindBookingPort, SaveBookingPort {
         return Optional.empty();
     }
 
-    /*
-     * Loads and mutates rather than rewriting the row, so the idempotency key
-     * and everything else the booking does not carry stay as they were.
-     */
     @Override
     @Transactional
+    /* Loads and mutates rather than rewriting the row, so the idempotency key and
+     * everything else the booking does not carry stay as they were. */
     public void updateStatus(final Booking booking) {
         BookingEntity entity = load(booking.id());
 

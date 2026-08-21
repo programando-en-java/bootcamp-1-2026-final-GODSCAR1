@@ -36,10 +36,6 @@ class ReadBookingFeignAdapter implements ReadBookingPort {
         return new BookingToPay(bookingId, passenger, total, response.status());
     }
 
-    /*
-     * The 404 is turned into an exception naming the booking here rather than in
-     * the decoder, which sees a response and not the question that produced it.
-     */
     private BookingResponse read(final BookingId bookingId) {
         try {
             return bookingClient.byId(bookingId.value());

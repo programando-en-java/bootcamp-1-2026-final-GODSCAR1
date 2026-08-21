@@ -8,13 +8,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * A fully resolved search, ready to be translated into a query.
- *
- * <p>departingFrom always has a value — a search with no lower bound would
- * return flights that have already left. The upper bound is nullable because a
- * search without a date has no end.
- */
 public record FlightSearchCriteria(@Nullable AirportCode origin,
                                    @Nullable AirportCode destination,
                                    Instant departingFrom,

@@ -15,11 +15,6 @@ public class TestcontainersConfiguration {
         return new PostgreSQLContainer("postgres:17-alpine");
     }
 
-    /*
-     * The listeners start with the application, so a context that has them needs
-     * a broker to subscribe to. @ServiceConnection points them at whatever port
-     * Docker picked.
-     */
     @Bean
     @ServiceConnection
     KafkaContainer kafkaContainer() {

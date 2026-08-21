@@ -36,10 +36,6 @@ public class UnitOfWorkAspect {
         return transactionRunner.executeInTransaction(action);
     }
 
-    /*
-     * Unchecked exceptions are rethrown untouched, or a domain failure would
-     * arrive at the handler wrapped and be answered with a 500.
-     */
     private static Object proceed(final ProceedingJoinPoint joinPoint) {
         try {
             return joinPoint.proceed();

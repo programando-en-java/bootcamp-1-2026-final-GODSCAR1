@@ -7,7 +7,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.function.Supplier;
 
-/** Three templates because readOnly and isolation are fixed on the template, not passed per call. */
 public class SpringTransactionRunner implements TransactionRunner {
 
     private static final int MAX_ATTEMPTS = 3;
@@ -32,17 +31,9 @@ public class SpringTransactionRunner implements TransactionRunner {
         return readWriteTemplate.execute(status -> action.get());
     }
 
-    /*
-     * A serialization failure is how PostgreSQL says "you two collided, one of
-     * you go again", not that anything is broken. Retrying is the other half of
-     * asking for serialisable, and without it a second click would be answered
-     * with a 500 instead of the booking the first one made.
-     *
-     * The whole action runs again, because the point is that its reads see the
-     * world the winner left behind. That is only safe because a unit of work
-     * here touches one database and nothing else.
-     */
     @Override
+    /* Retrying is the other half of asking for serialisable: the whole action runs
+     * again so its reads see what the winner left behind. */
     public <T> T executeSerializable(final Supplier<T> action) {
         for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
             try {
@@ -64,7 +55,6 @@ public class SpringTransactionRunner implements TransactionRunner {
         return serializableTemplate.execute(status -> action.get());
     }
 
-    /* Backing off a little keeps two callers from colliding again immediately. */
     private static void pauseAfter(final int attempt) {
         try {
             Thread.sleep(BACKOFF_MILLIS * attempt);

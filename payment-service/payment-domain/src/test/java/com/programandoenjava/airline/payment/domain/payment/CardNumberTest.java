@@ -32,11 +32,6 @@ class CardNumberTest {
             Assertions.assertThat(hyphenated).isEqualTo(new CardNumber(VALID));
         }
 
-        /*
-         * The card the gateway declines has to be a real number, or the refusal
-         * would come from validation rather than from the charge, and US-006
-         * would be testing the wrong thing.
-         */
         @Test
         @DisplayName("should accept the number the gateway is set up to decline")
         void shouldAcceptTheNumberTheGatewayIsSetUpToDecline() {
@@ -50,11 +45,6 @@ class CardNumberTest {
     @DisplayName("when the number is not one")
     class Rejecting {
 
-        /*
-         * The check digit every card carries. Without it a mistyped number
-         * reaches the gateway and comes back as a refusal, which tells the
-         * passenger the wrong thing.
-         */
         @Test
         @DisplayName("should reject a number with a digit mistyped")
         void shouldRejectANumberWithADigitMistyped() {
@@ -99,11 +89,6 @@ class CardNumberTest {
             Assertions.assertThat(card.lastFourDigits()).isEqualTo("4242");
         }
 
-        /*
-         * The one test worth more than it looks. Remove toString and the full
-         * number starts appearing wherever the object is concatenated, and
-         * nothing else in the suite would say so.
-         */
         @Test
         @DisplayName("should not print the number it holds")
         void shouldNotPrintTheNumberItHolds() {

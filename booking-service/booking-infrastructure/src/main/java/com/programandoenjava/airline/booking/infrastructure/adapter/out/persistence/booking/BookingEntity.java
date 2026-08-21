@@ -57,7 +57,6 @@ class BookingEntity {
     private Instant seatsReleasedAt;
 
     protected BookingEntity() {
-        // required by JPA
     }
 
     BookingEntity(final UUID id,

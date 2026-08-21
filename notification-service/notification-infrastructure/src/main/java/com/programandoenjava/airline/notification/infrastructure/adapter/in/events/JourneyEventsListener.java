@@ -12,19 +12,6 @@ import com.programandoenjava.airline.notification.infrastructure.adapter.in.even
 import org.springframework.kafka.annotation.KafkaListener;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The three topics this service listens to. One method each rather than one
- * with a branch: they arrive on different topics, carry different fields and
- * say different things.
- *
- * <p>Nothing here decides whether a message has been seen before. The event id
- * travels into the command and the use case claims it, because what must not
- * happen twice is the notification rather than the delivery (ADR-014).
- *
- * <p>Nothing is listened to on payment.failed.v1. No story asks for it, and a
- * passenger whose card was declined already learned that from the response to
- * their own request.
- */
 class JourneyEventsListener {
 
     private final NotifyPassengerUseCase notifyPassenger;

@@ -30,7 +30,6 @@ final class SearchFlightsRequestMapper {
                 page);
     }
 
-    /** A missing filter is null, not an empty AirportCode. */
     private static @Nullable AirportCode toAirportCode(@Nullable final String value) {
         return value == null || value.isBlank() ? null : new AirportCode(value);
     }
@@ -59,7 +58,6 @@ final class SearchFlightsRequestMapper {
         }
     }
 
-    /** departureTime becomes DEPARTURE_TIME, so the enum can stay in Java style. */
     private static String camelToUpperSnake(final String value) {
         return value.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase(Locale.ROOT);
     }

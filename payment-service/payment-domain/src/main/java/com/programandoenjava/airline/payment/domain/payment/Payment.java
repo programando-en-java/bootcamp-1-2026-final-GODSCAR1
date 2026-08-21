@@ -5,10 +5,6 @@ import com.programandoenjava.airline.payment.domain.shared.Money;
 
 import java.time.Instant;
 
-/**
- * An attempt to charge for a booking, settled either way. A refusal is kept, not
- * discarded: it is what the passenger is told and what the saga announces.
- */
 public record Payment(
         PaymentId id,
         BookingId bookingId,

@@ -14,18 +14,10 @@ class ProcessedEventsAdapter implements ProcessedEventsPort {
         this.processedEventsJpaRepository = processedEventsJpaRepository;
     }
 
-    /**
-     * Looks before it writes, which read committed would let two deliveries of
-     * the same message do at once. Serialisable is what stops them: the second
-     * is refused by the database rather than allowed to insert a row the first
-     * one is already inserting.
-     *
-     * <p>Nothing retries here, and nothing needs to. A refusal fails the
-     * listener, the broker delivers the message again, and the second time the
-     * row is there and this answers false (ADR-014).
-     */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
+    /* No retry, and none needed: a refusal fails the listener and the broker delivers
+     * again, so the redelivery is the retry. */
     public boolean claim(final UUID eventId) {
         boolean alreadyProcessed = processedEventsJpaRepository.existsById(eventId);
 

@@ -23,11 +23,6 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /*
-     * Bean Validation failures already come back as a 400 ProblemDetail from
-     * the parent. This override adds which field failed and why, so the client
-     * does not have to guess.
-     */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             final MethodArgumentNotValidException exception,
@@ -50,29 +45,16 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
-    /*
-     * A domain invariant violated by client input: an airport code that is not
-     * three letters, a currency that does not exist.
-     */
     @ExceptionHandler(DomainValidationException.class)
     ProblemDetail onDomainValidation(final DomainValidationException exception) {
         return badRequest("Invalid request", exception.getMessage());
     }
 
-    /*
-     * A sort field that is not in SortableField. Bean Validation checked the
-     * shape of the expression; this is the whitelist.
-     */
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail onIllegalArgument(final IllegalArgumentException exception) {
         return badRequest("Invalid request parameter", exception.getMessage());
     }
 
-    /*
-     * Anything not handled above is a defect, not a bad request. The stack
-     * trace is logged and deliberately not returned: internal details, table
-     * names and class names have no business reaching a client.
-     */
     @ExceptionHandler(Exception.class)
     ProblemDetail onUnexpectedError(final Exception exception) {
         LOG.error("Unhandled exception", exception);
@@ -85,11 +67,6 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /**
-     * The flight exists but has gone. Nothing the caller changes about the
-     * request will make it succeed, which is what separates this from a
-     * conflict: 409 invites a retry, 422 does not.
-     */
     @ExceptionHandler(FlightDepartedException.class)
     ProblemDetail handleFlightDeparted(final FlightDepartedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -99,11 +76,6 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /**
-     * The request was well formed and may succeed later, or for a smaller party.
-     * The message carries how many seats were left, which is the only thing that
-     * makes this answer actionable.
-     */
     @ExceptionHandler(InsufficientSeatsException.class)
     ProblemDetail handleInsufficientSeats(final InsufficientSeatsException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -113,11 +85,6 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
-    /**
-     * A booking asked for seats twice under two different keys. Refused rather
-     * than honoured: a booking holding two sets of seats is a booking holding
-     * seats nobody will pay for.
-     */
     @ExceptionHandler(BookingAlreadyHoldsSeatsException.class)
     ProblemDetail handleBookingAlreadyHoldsSeats(final BookingAlreadyHoldsSeatsException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(

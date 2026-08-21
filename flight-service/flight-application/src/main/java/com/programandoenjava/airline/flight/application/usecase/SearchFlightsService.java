@@ -52,11 +52,6 @@ public class SearchFlightsService implements SearchFlightsUseCase {
         return loadFlightsPort.search(criteria);
     }
 
-    /*
-     * Without a date the search starts now. With one it starts at midnight, but
-     * never earlier than now: asking for today must not return this morning's
-     * departures. That clamp is where the two acceptance criteria meet.
-     */
     private Instant lowerBound(@Nullable final LocalDate date, final Instant now) {
         if (date == null) {
             return now;

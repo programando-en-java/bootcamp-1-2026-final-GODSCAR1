@@ -1,6 +1,5 @@
 package com.programandoenjava.airline.flight.domain;
 
-
 import com.programandoenjava.airline.flight.domain.flight.SeatInventory;
 import com.programandoenjava.airline.flight.domain.shared.DomainValidationException;
 import org.assertj.core.api.Assertions;

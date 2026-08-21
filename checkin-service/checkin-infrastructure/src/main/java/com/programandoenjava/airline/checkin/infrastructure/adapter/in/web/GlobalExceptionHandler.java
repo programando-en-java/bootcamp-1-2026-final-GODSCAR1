@@ -24,13 +24,6 @@ import java.net.URI;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/*
- * US-008 asks that the passenger be told what is wrong, and one 409 for every
- * refusal would not be telling them. The four ways a check-in can be refused
- * each get their own title and type, because each calls for something different:
- * pay for the booking, come back later, go to the counter, and the flight has
- * gone.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -88,10 +81,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 exception.getMessage(), "flight-departed");
     }
 
-    /*
-     * Not the passenger's doing: the booking names a flight flight-service does
-     * not have, which is the two services disagreeing.
-     */
     @ExceptionHandler(FlightNotFoundException.class)
     ProblemDetail handleFlightNotFound(final FlightNotFoundException exception) {
         logger.error("booking names a flight flight-service does not have", exception);

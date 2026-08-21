@@ -11,14 +11,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.UUID;
 
-/**
- * Turns the in-process event into the flat one other services read, and puts it
- * in the outbox.
- *
- * <p>BEFORE_COMMIT, so the row joins the transaction that wrote the booking.
- * AFTER_COMMIT would announce a booking whenever the write that followed
- * failed, and lose one whenever this did (ADR-001).
- */
 class BookingCreatedListener {
 
     private static final String AGGREGATE_TYPE = "booking";
@@ -35,6 +27,8 @@ class BookingCreatedListener {
         this.clock = clock;
     }
 
+    /* BEFORE_COMMIT, so the row joins the transaction that caused it. AFTER_COMMIT
+     * would announce what never happened and lose what did (ADR-001). */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(final BookingCreated created) {
         Booking booking = created.booking();

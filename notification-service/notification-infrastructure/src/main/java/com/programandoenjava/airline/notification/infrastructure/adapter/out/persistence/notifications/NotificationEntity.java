@@ -41,7 +41,6 @@ class NotificationEntity {
     private @Nullable Instant sentAt;
 
     protected NotificationEntity() {
-        // required by JPA
     }
 
     NotificationEntity(final UUID id,

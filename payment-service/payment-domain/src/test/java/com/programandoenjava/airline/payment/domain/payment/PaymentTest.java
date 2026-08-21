@@ -25,10 +25,6 @@ class PaymentTest {
         Assertions.assertThat(payment.cardLastFourDigits()).isEqualTo("4242");
     }
 
-    /*
-     * A refusal is a fact, not an absence. It is what the passenger is shown and
-     * what the saga announces, so it carries the same detail as a success.
-     */
     @Test
     @DisplayName("should record a refusal as fully as a charge")
     void shouldRecordARefusalAsFullyAsACharge() {

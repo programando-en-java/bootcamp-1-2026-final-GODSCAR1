@@ -14,16 +14,6 @@ import com.programandoenjava.airline.payment.domain.shared.Money;
 import java.time.Clock;
 import java.time.Instant;
 
-/*
- * The amount is read from the booking rather than taken from the request, so a
- * caller cannot decide what it owes.
- *
- * A refusal is recorded and announced, not thrown. The charge happened and was
- * declined, which is what the passenger is told and what the saga acts on.
- *
- * No transaction here: reading the booking and charging the card are network
- * calls, and the writes that must be atomic are behind PaymentRecorder.
- */
 public class PayBookingService implements PayBookingUseCase {
 
     private final ReadBookingPort readBooking;

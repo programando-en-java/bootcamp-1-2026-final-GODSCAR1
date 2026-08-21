@@ -21,7 +21,6 @@ public interface FlightClient {
                                  @RequestHeader("Idempotency-Key") String idempotencyKey,
                                  @RequestBody BlockSeatsRequest request);
 
-    /** Answers 204 whether the hold was there or not, so a retry is free. */
     @DeleteMapping("/api/v1/flights/{flightId}/seat-blocks/{seatBlockId}")
     void releaseSeats(@PathVariable UUID flightId, @PathVariable UUID seatBlockId);
 }

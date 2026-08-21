@@ -47,18 +47,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/**
- * Checking in, against a real database. US-007 and US-008 both live here.
- *
- * <p>booking-service and flight-service are mocked at the port: what they answer
- * is their business, and that the two of them and this one agree is what the
- * end-to-end test is for. What cannot be mocked and is the reason for a real
- * database: one pass per booking, and the boarding order.
- *
- * <p>The clock is pinned because every rule in here is about time. Departures
- * are expressed as distances from that instant rather than as literal dates, so
- * a test says "inside the window" instead of leaving the reader to subtract.
- */
 @SpringBootTest(classes = {
         CheckInController.class,
         GlobalExceptionHandler.class,
@@ -84,7 +72,6 @@ class CheckInSliceTest {
 
     private static final Instant NOW = Instant.parse("2026-03-10T12:00:00Z");
 
-    /** Inside the window: twenty hours ahead, so open and not yet closing. */
     private static final Instant SOON = NOW.plus(Duration.ofHours(20));
 
     private static final Instant TOO_FAR_AHEAD = NOW.plus(Duration.ofHours(48));
@@ -113,10 +100,6 @@ class CheckInSliceTest {
     @MockitoBean
     private ReadFlightPort readFlightPort;
 
-    /*
-     * Announcing is its own concern and has its own test. What matters here is
-     * that nothing in this file changes when it arrives.
-     */
     @MockitoBean
     private DomainEventPublisher domainEventPublisher;
 
@@ -144,10 +127,6 @@ class CheckInSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.issuedAt").value(NOW.toString()));
         }
 
-        /*
-         * The fields copied off the flight. This is the whole reason
-         * flight-service is read at all, so it is asserted rather than assumed.
-         */
         @Test
         @DisplayName("should print the flight it was read from")
         void shouldPrintTheFlightItWasReadFrom() throws Exception {
@@ -188,11 +167,6 @@ class CheckInSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.boardingSequence").value(2));
         }
 
-        /*
-         * The order is per flight, not global. Without this, the second flight
-         * of the day would start boarding at whatever number the first one
-         * happened to reach.
-         */
         @Test
         @DisplayName("should start another flight at the first place again")
         void shouldStartAnotherFlightAtTheFirstPlaceAgain() throws Exception {
@@ -249,10 +223,6 @@ class CheckInSliceTest {
             Assertions.assertThat(passCount()).isEqualTo(1);
         }
 
-        /*
-         * A passenger refreshing the page must not push everyone else back a
-         * place. The number is taken only when a pass is actually issued.
-         */
         @Test
         @DisplayName("should not take another place in the boarding order")
         void shouldNotTakeAnotherPlaceInTheBoardingOrder() throws Exception {
@@ -308,10 +278,6 @@ class CheckInSliceTest {
                     .andExpect(MockMvcResultMatchers.status().isConflict());
         }
 
-        /*
-         * US-008 asks that the passenger be told what is wrong. Naming the
-         * status is the difference between "no" and "pay for it first".
-         */
         @Test
         @DisplayName("should say what state the booking is in")
         void shouldSayWhatStateTheBookingIsIn() throws Exception {
@@ -386,10 +352,6 @@ class CheckInSliceTest {
                             .value("Check-in has closed"));
         }
 
-        /*
-         * Closed and departed are different answers on purpose: one sends the
-         * passenger to a desk, the other tells them the aeroplane has gone.
-         */
         @Test
         @DisplayName("should say the flight has gone once it has")
         void shouldSayTheFlightHasGoneOnceItHas() throws Exception {

@@ -27,17 +27,6 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.util.UUID;
 
-/**
- * Reading one flight, which is what checkin-service will do before it issues a
- * boarding pass.
- *
- * <p>No clock is pinned, unlike the other slices here. This endpoint does not
- * ask what time it is: a departed flight is as readable as any other, and the
- * test below says so on purpose rather than by omission.
- *
- * <p>Flights are looked up by number rather than by hard-coded id, so changing
- * a uuid in the seed does not turn these into an unexplained 404.
- */
 @SpringBootTest(classes = {
         FlightController.class,
         GlobalExceptionHandler.class,
@@ -64,7 +53,6 @@ class FlightReadSliceTest {
 
     private static final String BOOKABLE = "AV8001";
 
-    /** The one flight in the seed whose departure sits in the past. */
     private static final String DEPARTED = "AV9000";
 
     private static final String ORIGIN = "BOG";
@@ -74,12 +62,6 @@ class FlightReadSliceTest {
     private static final int SEATS_LEFT = 45;
     private static final String CURRENCY = "COP";
 
-    /*
-     * Compared as a number with tolerance rather than for equality: Jackson
-     * writes the BigDecimal as a JSON number and JsonPath reads it back as a
-     * Double, so 250000.00 and 250000.0 are the same amount and different
-     * objects.
-     */
     private static final double FARE = 250_000.00;
     private static final double A_CENT = 0.001;
 
@@ -107,10 +89,6 @@ class FlightReadSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.flightNumber").value(BOOKABLE));
         }
 
-        /*
-         * The fields a boarding pass is printed from. Asserted together because
-         * a pass missing any one of them is not a pass.
-         */
         @Test
         @DisplayName("should carry the route and the schedule a pass is printed from")
         void shouldCarryTheRouteAndTheSchedule() throws Exception {
@@ -144,12 +122,6 @@ class FlightReadSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.totalSeats").doesNotExist());
         }
 
-        /*
-         * The search hides departed flights because nobody can buy a seat on
-         * one. Reading is the opposite case: a passenger who has already flown
-         * still has a pass, and checkin-service needs the departure time to say
-         * why it will not issue another.
-         */
         @Test
         @DisplayName("should answer for a flight that has already departed")
         void shouldAnswerForAFlightThatHasAlreadyDeparted() throws Exception {

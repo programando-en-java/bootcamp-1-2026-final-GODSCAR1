@@ -25,10 +25,6 @@ public class ApplicationConfiguration {
         return Clock.systemUTC();
     }
 
-    /**
-     * The rule lives in the domain and the two numbers live here, so an airline
-     * that opens check-in earlier changes configuration rather than code.
-     */
     @Bean
     CheckInWindow checkInWindow(
             @Value("${airline.checkin.opens-before}") final Duration opensBefore,

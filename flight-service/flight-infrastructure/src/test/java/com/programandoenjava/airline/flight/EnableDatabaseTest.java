@@ -14,13 +14,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Turns a hand-built slice into one with a real database behind it.
- *
- * <p>A slice that lists its own beans has auto-configuration switched off, so
- * everything JPA needs has to be asked for by name. Replace.NONE is what stops
- * Boot swapping the Testcontainers datasource for an embedded one.
- */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Documented

@@ -36,11 +36,6 @@ class ReadBookingFeignAdapter implements ReadBookingPort {
         return new BookingToCheckIn(bookingId, passenger, flight, response.status());
     }
 
-    /*
-     * The 404 becomes an exception naming the booking here, where the question
-     * is known. Compared by number rather than by a Spring constant, which is
-     * the lesson ADR-012 records.
-     */
     private BookingResponse read(final BookingId bookingId) {
         try {
             return bookingClient.byId(bookingId.value());

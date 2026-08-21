@@ -13,10 +13,6 @@ import com.programandoenjava.airline.flight.domain.seatblock.SeatBlock;
 
 import java.util.Optional;
 
-/**
- * A missing hold means the seats are already back, which is what the caller
- * wanted. The flight is locked because this writes its seat count.
- */
 public class ReleaseSeatsService implements ReleaseSeatsUseCase {
 
     private final LockFlightPort lockFlight;

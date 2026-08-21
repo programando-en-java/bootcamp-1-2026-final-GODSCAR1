@@ -36,23 +36,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/**
- * Holding seats, against a real database.
- *
- * <p>Unlike the search slice, every test here writes: seats come off a flight
- * and a row appears in seat_blocks. The seed is replayed before each one rather
- * than wrapping tests in a rolled-back transaction, because that transaction
- * would nest inside the one {@code @UnitOfWork} opens and the lock would stop
- * behaving the way it does in production — which is the one thing this endpoint
- * exists to get right.
- *
- * <p>The clock is pinned to the same instant as FlightSearchSliceTest, because
- * both read the same seed and its departures are literal dates. Left to the wall
- * clock every flight in it has departed and every request here answers 422.
- *
- * <p>Flights are looked up by number rather than by hard-coded id, so changing a
- * uuid in the seed does not turn every test in here into an unexplained 404.
- */
 @SpringBootTest(classes = {
         FlightController.class,
         GlobalExceptionHandler.class,
@@ -77,10 +60,8 @@ class SeatBlockSliceTest {
 
     private static final String BOOKABLE = "AV8001";
 
-    /** A second bookable flight, so a hold can be asked for on the wrong one. */
     private static final String ANOTHER_BOOKABLE = "AV8002";
 
-    /** The one flight in the seed whose departure sits behind the fixed clock. */
     private static final String DEPARTED = "AV9000";
 
     private static final String SEAT_BLOCKS = "/api/v1/flights/{flightId}/seat-blocks";
@@ -99,12 +80,6 @@ class SeatBlockSliceTest {
     private static final String NOT_ENOUGH_SEATS = "only " + SEATS_LEFT + " available";
     private static final String NOT_BOOKABLE = "no longer open for booking";
 
-    /*
-     * AV8001's fare in the seed. Compared as a number with tolerance rather than
-     * for equality: Jackson writes the BigDecimal as a JSON number and JsonPath
-     * reads it back as a Double, so 250000.00 and 250000.0 are the same amount
-     * and different objects.
-     */
     private static final double FARE = 250_000.00;
     private static final double A_CENT = 0.001;
     private static final String CURRENCY = "COP";
@@ -135,11 +110,6 @@ class SeatBlockSliceTest {
     @DisplayName("holding seats")
     class Holding {
 
-        /*
-         * Asserted as a difference rather than against a number, so the test
-         * says "two fewer than before" instead of quietly depending on AV8001
-         * having started at 45.
-         */
         @Test
         @DisplayName("should take the seats off the flight")
         void shouldTakeTheSeatsOffTheFlight() throws Exception {
@@ -179,11 +149,6 @@ class SeatBlockSliceTest {
             Assertions.assertThat(availableSeats(BOOKABLE)).isZero();
         }
 
-        /*
-         * The unique index is on the booking, not on the flight. Without this
-         * test, an index accidentally placed on flight_id would let one booking
-         * through and reject every other passenger on that departure.
-         */
         @Test
         @DisplayName("should let two bookings hold seats on the same flight")
         void shouldLetTwoBookingsHoldSeatsOnTheSameFlight() throws Exception {
@@ -201,13 +166,6 @@ class SeatBlockSliceTest {
     @DisplayName("asking twice")
     class AskingTwice {
 
-        /*
-         * What the idempotency key is for: a caller whose response was lost
-         * retries, and is told about the seats it already holds rather than
-         * given a second set. These are the only tests that hold onto a key
-         * across calls — everywhere else aKey() is called inline, so each
-         * request is a new one.
-         */
         @Test
         @DisplayName("should answer a repeated request with the block it already made")
         void shouldAnswerARepeatedRequestWithTheBlockItAlreadyMade() throws Exception {
@@ -239,11 +197,6 @@ class SeatBlockSliceTest {
             Assertions.assertThat(availableSeats(BOOKABLE)).isEqualTo(before - SEATS_WANTED);
         }
 
-        /*
-         * A different key for a booking that already holds seats is not a retry,
-         * it is a second request. Honouring it would leave the booking holding
-         * two sets of seats, one of which nobody will ever pay for.
-         */
         @Test
         @DisplayName("should refuse a booking that already holds seats under another key")
         void shouldRefuseABookingThatAlreadyHoldsSeatsUnderAnotherKey() throws Exception {
@@ -282,10 +235,6 @@ class SeatBlockSliceTest {
                     .andExpect(MockMvcResultMatchers.status().isConflict());
         }
 
-        /*
-         * 422 rather than 409: a departed flight will not become bookable again,
-         * so there is nothing for the caller to retry.
-         */
         @Test
         @DisplayName("should refuse a flight that has already departed")
         void shouldRefuseAFlightThatHasAlreadyDeparted() throws Exception {
@@ -363,10 +312,6 @@ class SeatBlockSliceTest {
                     .andExpect(MockMvcResultMatchers.status().isCreated());
         }
 
-        /*
-         * The saga retries this step until it is told the seats are back, so a
-         * second release has to look like the first.
-         */
         @Test
         @DisplayName("should succeed when the hold is already gone")
         void shouldSucceedWhenTheHoldIsAlreadyGone() throws Exception {
@@ -389,10 +334,6 @@ class SeatBlockSliceTest {
                     .andExpect(MockMvcResultMatchers.status().isNoContent());
         }
 
-        /*
-         * A block on another flight is not this flight's to give back. Nothing is
-         * released, and the answer is the same as for a hold that never existed.
-         */
         @Test
         @DisplayName("should leave alone a hold that belongs to another flight")
         void shouldLeaveAloneAHoldThatBelongsToAnotherFlight() throws Exception {
@@ -464,7 +405,6 @@ class SeatBlockSliceTest {
         }
     }
 
-    /** Holds seats and hands back the id of the block, which is what a release names. */
     private String holdSeatsOn(final String flightNumber) throws Exception {
         String body = mockMvc.perform(blockRequest(flightNumber, aBooking(), SEATS_WANTED, aKey()))
                 .andReturn().getResponse().getContentAsString();
@@ -512,7 +452,6 @@ class SeatBlockSliceTest {
         return jdbcTemplate.queryForObject(COUNT_BLOCKS, Long.class);
     }
 
-    /** Sets up the one precondition several tests turn on, without naming a seed value. */
     private void leaveOnly(final int seats, final String flightNumber) {
         jdbcTemplate.update(SET_AVAILABLE_SEATS, seats, flightNumber);
     }
@@ -521,11 +460,6 @@ class SeatBlockSliceTest {
         return UUID.randomUUID().toString();
     }
 
-    /**
-     * A fresh key per call, so a test that does not care about idempotency never
-     * collides with a block another test left behind. The two that do care hold
-     * onto the key in a local, which is what marks them as retries.
-     */
     private static String aKey() {
         return UUID.randomUUID().toString();
     }

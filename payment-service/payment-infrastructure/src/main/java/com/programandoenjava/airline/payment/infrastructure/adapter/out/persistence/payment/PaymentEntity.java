@@ -28,7 +28,6 @@ class PaymentEntity {
     @Column(nullable = false, length = 3)
     private String currency;
 
-    /* STRING, not ORDINAL: a value added to the enum would remap every row. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private PaymentStatus status;
@@ -40,7 +39,6 @@ class PaymentEntity {
     private Instant processedAt;
 
     protected PaymentEntity() {
-        // required by JPA
     }
 
     PaymentEntity(final UUID id,

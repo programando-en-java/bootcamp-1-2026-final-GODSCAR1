@@ -43,7 +43,6 @@ class BoardingPassEntity {
     private Instant issuedAt;
 
     protected BoardingPassEntity() {
-        // required by JPA
     }
 
     BoardingPassEntity(final UUID id,

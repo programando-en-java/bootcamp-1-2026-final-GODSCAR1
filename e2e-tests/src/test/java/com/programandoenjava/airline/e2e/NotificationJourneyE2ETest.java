@@ -25,18 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * The three notifications of EPIC-05, across the whole system.
- *
- * <p>This is the only place the epic can be shown at all. Nothing here calls
- * notification-service: it is told what happened by three other services, over
- * three topics, and whether their messages can actually be read by the thing
- * consuming them is what a slice with a mocked port cannot answer.
- *
- * <p>Every assertion polls. A notification arrives when the outbox relay has
- * swept, the broker has delivered and the consumer has run, none of which has
- * happened by the time the request that caused it has answered.
- */
 @EnabledIfSystemProperty(named = "airline.e2e", matches = "true")
 @DisplayName("Telling the passenger, end to end")
 class NotificationJourneyE2ETest {
@@ -60,15 +48,8 @@ class NotificationJourneyE2ETest {
     private static final String PAYMENT_SUCCEEDED = "PAYMENT_SUCCEEDED";
     private static final String CHECK_IN_COMPLETED = "CHECK_IN_COMPLETED";
 
-    /** Inside the check-in window, which opens a day before departure. */
     private static final int HOURS_UNTIL_DEPARTURE = 3;
 
-    /*
-     * Sixty seconds since notification-service joined the stack. Eleven
-     * containers share one machine, and a consumer group's first message also
-     * waits out Kafka's initial rebalance delay. The budget is a limit on
-     * patience, not a statement about how long this should take.
-     */
     private static final Duration ARRIVAL_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration BETWEEN_POLLS = Duration.ofMillis(250);
 
@@ -126,11 +107,6 @@ class NotificationJourneyE2ETest {
             awaitNotification(bookingId, BOOKING_CREATED);
         }
 
-        /*
-         * booking-service had no outbox until this epic. ADR-001 said it would
-         * never need one because everything it could announce another service
-         * already knew, and this is the case that turned out not to fit.
-         */
         @Test
         @DisplayName("should say what is held and what is owed")
         void shouldSayWhatIsHeldAndWhatIsOwed() {
@@ -149,11 +125,6 @@ class NotificationJourneyE2ETest {
     @DisplayName("when the payment goes through")
     class PaymentSucceeded {
 
-        /*
-         * The passenger reaches this message because payment.succeeded.v1 was
-         * given a passengerId for this epic. Before that there was nobody to
-         * address it to, and payment-service did not even know who to name.
-         */
         @Test
         @DisplayName("should tell the passenger their payment arrived")
         void shouldTellThePassengerTheirPaymentArrived() {
@@ -166,10 +137,6 @@ class NotificationJourneyE2ETest {
             awaitNotification(bookingId, PAYMENT_SUCCEEDED);
         }
 
-        /*
-         * No story asks for one, and nothing listens on payment.failed.v1. The
-         * passenger already learned this from the answer to their own request.
-         */
         @Test
         @DisplayName("should say nothing when the card is declined")
         void shouldSayNothingWhenTheCardIsDeclined() {
@@ -208,14 +175,6 @@ class NotificationJourneyE2ETest {
     @DisplayName("across the whole journey")
     class Whole {
 
-        /*
-         * In any order, on purpose. The three arrive on three topics, and Kafka
-         * orders messages within a partition rather than across topics. Spring
-         * gives each listener a container of its own, so the three are consumed
-         * in parallel: asserting a sequence here would be asserting something
-         * this system has never promised, and it would fail on the run where
-         * two land in the same instant.
-         */
         @Test
         @DisplayName("should tell the passenger three times, once for each thing that happened")
         void shouldTellThePassengerThreeTimes() {
@@ -226,6 +185,7 @@ class NotificationJourneyE2ETest {
             List<String> types = typesFor(bookingId);
 
             Assertions.assertThat(types)
+                    /* In any order: three topics, and Kafka orders within a partition, not across them. */
                     .containsExactlyInAnyOrder(
                             BOOKING_CREATED, PAYMENT_SUCCEEDED, CHECK_IN_COMPLETED);
         }
@@ -326,11 +286,6 @@ class NotificationJourneyE2ETest {
         await(() -> countOf(bookingId, type) == 1);
     }
 
-    /*
-     * Waiting for the last thing that happened does not mean the first has
-     * arrived: three consumers run at their own pace, and the check-in message
-     * can be dealt with while the payment one is still in flight.
-     */
     private void awaitAllThree(final String bookingId) {
         awaitNotification(bookingId, BOOKING_CREATED);
         awaitNotification(bookingId, PAYMENT_SUCCEEDED);
@@ -387,7 +342,6 @@ class NotificationJourneyE2ETest {
     private static RestClient client(final String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
-                /* A 4xx is an answer here, not a failure. */
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();

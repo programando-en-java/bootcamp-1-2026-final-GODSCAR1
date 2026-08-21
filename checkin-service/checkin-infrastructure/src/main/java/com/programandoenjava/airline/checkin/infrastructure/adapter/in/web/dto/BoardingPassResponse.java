@@ -6,10 +6,6 @@ import com.programandoenjava.airline.checkin.domain.boardingpass.FlightSnapshot;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * The pass as it would be printed. No seat: this system does not have any, and
- * the boarding sequence is what says where a passenger stands instead.
- */
 public record BoardingPassResponse(UUID boardingPassId,
                                    UUID bookingId,
                                    UUID passengerId,

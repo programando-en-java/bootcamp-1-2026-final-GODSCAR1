@@ -147,11 +147,6 @@ class BookingTest {
             Assertions.assertThat(confirmed.createdAt()).isEqualTo(pending.createdAt());
         }
 
-        /*
-         * The payment event arrives at least once, so the consumer will confirm
-         * the same booking twice. That is the delivery guarantee doing its job,
-         * not a caller making a mistake.
-         */
         @Test
         @DisplayName("should accept being confirmed a second time")
         void shouldAcceptBeingConfirmedASecondTime() {
@@ -187,11 +182,6 @@ class BookingTest {
             Assertions.assertThat(failed.status()).isEqualTo(BookingStatus.FAILED);
         }
 
-        /*
-         * The seats are still held at this point. Releasing them happens over
-         * HTTP against flight-service, and the booking has no way of knowing
-         * whether that worked.
-         */
         @Test
         @DisplayName("should keep the hold it was made against")
         void shouldKeepTheHoldItWasMadeAgainst() {

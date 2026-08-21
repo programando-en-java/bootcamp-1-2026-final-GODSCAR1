@@ -50,7 +50,6 @@ class FlightController {
         this.readFlightUseCase = readFlightUseCase;
     }
 
-
     @GetMapping
     PageResult<FlightResponse> search(
             @Valid final SearchFlightsRequest request,
@@ -63,11 +62,6 @@ class FlightController {
         return flights.map(FlightResponse::from);
     }
 
-    /**
-     * Answers for a departed flight as readily as for a future one. The caller
-     * is checkin-service, which reads this to decide whether its window is
-     * open, and a flight it cannot read is one it cannot explain.
-     */
     @GetMapping("/{flightId}")
     FlightResponse byId(@PathVariable final UUID flightId) {
         FlightId id = new FlightId(flightId);
@@ -77,18 +71,6 @@ class FlightController {
         return FlightResponse.from(flight);
     }
 
-    /**
-     * Holds seats on a flight for a booking.
-     *
-     * <p>The idempotency key is required rather than optional. The only caller is
-     * booking-service, and the cost of a forgotten key is seats sold twice; a
-     * caller that has to be told to send one is better than a caller that
-     * silently double-books on a retry.
-     *
-     * <p>Answers 201 on both the first request and a repeat of it. A repeat is
-     * not an error — the seats it asked for are held, which is what it wanted to
-     * know.
-     */
     @PostMapping("/{flightId}/seat-blocks")
     @ResponseStatus(HttpStatus.CREATED)
     SeatBlockResponse blockSeats(
@@ -104,10 +86,6 @@ class FlightController {
         return SeatBlockResponse.from(held);
     }
 
-    /**
-     * Answers 204 whether the hold was there or not, so the saga can retry. No
-     * idempotency key: the block's own id already says what the request is about.
-     */
     @DeleteMapping("/{flightId}/seat-blocks/{seatBlockId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void releaseSeats(@PathVariable final UUID flightId,

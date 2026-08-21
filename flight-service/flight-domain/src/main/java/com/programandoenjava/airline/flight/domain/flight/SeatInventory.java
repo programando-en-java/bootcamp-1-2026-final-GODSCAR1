@@ -27,9 +27,6 @@ public record SeatInventory(int total, int available) {
         return seats > 0 && seats <= available;
     }
 
-    /**
-     * Returns a new inventory with the given seats taken.
-     */
     public SeatInventory block(final int seats) {
         if (!canAccommodate(seats)) {
             throw new InsufficientSeatsException(

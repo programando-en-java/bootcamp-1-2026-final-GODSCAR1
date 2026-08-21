@@ -6,11 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-/**
- * Only what differs from the other services' copies. The shared rules are
- * proven twice already; what is new here is that a charge of nothing is not a
- * charge, and that this Money cannot be multiplied because nothing multiplies it.
- */
 @DisplayName("Money")
 class MoneyTest {
 

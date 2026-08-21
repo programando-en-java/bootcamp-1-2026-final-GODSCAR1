@@ -50,25 +50,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
-/**
- * What holds the idempotency key up, now that a single statement no longer does.
- *
- * <p>The check and the write used to be one {@code INSERT ... ON CONFLICT},
- * which two callers could not get between. They are two statements again, and
- * what keeps them apart is {@code @UnitOfWork(isolation = SERIALIZABLE)} on
- * BookingRecorder plus the retry behind it (ADR-019).
- *
- * <p>That makes an annotation load bearing, and an annotation is easy to
- * delete. Take it off and every other test in this module still passes: one
- * request at a time never notices its isolation level. This is the only test
- * that fails, which is what makes it worth its cost. Without it the two
- * requests both read no booking, both insert, and the unique index answers the
- * second with a 500.
- *
- * <p>What is asserted is not how the race is won but what must be true whoever
- * wins: one booking exists, everybody is told about the same one, and nobody is
- * told the system broke.
- */
 @SpringBootTest(classes = {
         BookingController.class,
         GlobalExceptionHandler.class,
@@ -87,16 +68,13 @@ import java.util.stream.IntStream;
 @Sql(scripts = "/db/testdata/R__reset_bookings.sql",
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @DisplayName("Booking the same request twice at once")
+/* The only test that fails if the serialisable isolation comes off BookingRecorder:
+ * one request at a time never notices its isolation level (ADR-019). */
 class ConcurrentBookingTest {
 
     private static final String BOOKINGS = "/api/v1/bookings";
     private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
-    /*
-     * Eight rather than two. A double click is two, but two threads on a fast
-     * machine often queue up behind each other and never actually overlap;
-     * eight makes the interleaving happen.
-     */
     private static final int CLICKS = 8;
     private static final int SEATS_WANTED = 2;
 
@@ -118,10 +96,6 @@ class ConcurrentBookingTest {
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
 
-    /*
-     * ApplicationConfiguration wires every use case this service has, and the
-     * two that settle a booking are not the subject here.
-     */
     @MockitoBean
     private ProcessedEventsPort processedEventsPort;
 
@@ -150,12 +124,6 @@ class ConcurrentBookingTest {
                 .isEqualTo(1);
     }
 
-    /*
-     * A 500 here would mean the unique index caught what the isolation should
-     * have, which is the database saving the application from itself rather
-     * than the application being correct. It is also what the passenger would
-     * see: an error for having clicked twice.
-     */
     @Test
     @DisplayName("should answer every one of them, and none with a failure")
     void shouldAnswerEveryOneOfThemAndNoneWithAFailure() throws Exception {
@@ -184,11 +152,7 @@ class ConcurrentBookingTest {
     private record Answer(int status, String bookingId) {
     }
 
-    /*
-     * The latch is what makes this a race. Without it the threads start as the
-     * pool gets round to them, which on a fast machine is nearly sequential and
-     * the contention never happens.
-     */
+    /* The latch is what makes this a race: without it the pool runs them nearly in order. */
     private List<Answer> clickManyTimes() throws Exception {
         UUID passenger = UUID.randomUUID();
         UUID flight = UUID.randomUUID();
@@ -241,7 +205,6 @@ class ConcurrentBookingTest {
         return new Answer(status, bookingIdIn(status, payload));
     }
 
-    /* A failed answer carries a problem detail, not a booking. */
     private static String bookingIdIn(final int status, final String payload) {
         boolean created = status == CREATED;
 

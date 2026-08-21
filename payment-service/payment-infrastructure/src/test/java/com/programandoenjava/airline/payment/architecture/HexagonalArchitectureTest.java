@@ -8,7 +8,6 @@ import com.tngtech.archunit.library.Architectures;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/** Duplicated from the other services rather than shared (ADR-003). */
 @AnalyzeClasses(
         packages = "com.programandoenjava.airline.payment",
         importOptions = ImportOption.DoNotIncludeTests.class)
@@ -74,11 +73,6 @@ class HexagonalArchitectureTest {
             .should().dependOnClassesThat().areAnnotatedWith("jakarta.persistence.Entity")
             .as("JPA entities must not escape the persistence adapter");
 
-    /*
-     * The card number reaches the gateway adapter and stops there. A charge is
-     * the last thing that may see it, and this rule is what stops the next
-     * feature quietly logging or storing a PAN.
-     */
     @ArchTest
     static final ArchRule onlyTheGatewaySeesACardNumber = noClasses()
             .that().resideOutsideOfPackages(

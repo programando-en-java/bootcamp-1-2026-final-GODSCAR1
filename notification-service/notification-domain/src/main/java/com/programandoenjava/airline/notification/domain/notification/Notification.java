@@ -5,14 +5,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 
-/**
- * One thing a passenger was told, and whether it got out.
- *
- * <p>{@code sentAt} is null until the channel has taken it. Recorded first and
- * sent afterwards on purpose: a crash in between leaves a notification nobody
- * received, which somebody can find, rather than sending a second one to a
- * passenger who already read the first.
- */
 public record Notification(NotificationId id,
                            PassengerId passengerId,
                            BookingId bookingId,
@@ -51,7 +43,7 @@ public record Notification(NotificationId id,
                 type, message, now, null);
     }
 
-    /** Callers must use the return value: a record cannot mark itself. */
+    /* Callers must use the return value: a record cannot mark itself. */
     public Notification sentAt(final Instant when) {
         if (when == null) {
             throw new DomainValidationException("A send has to have a time");

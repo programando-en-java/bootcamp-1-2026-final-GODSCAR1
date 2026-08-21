@@ -30,11 +30,6 @@ class NotificationPersistenceAdapter implements SaveNotificationPort {
         notificationJpaRepository.save(entity);
     }
 
-    /*
-     * Loaded and mutated rather than saved over, so a notification that has
-     * gone missing between the write and the send cannot be recreated here by
-     * an id that no longer exists.
-     */
     @Override
     @Transactional
     public void markSent(final Notification notification) {

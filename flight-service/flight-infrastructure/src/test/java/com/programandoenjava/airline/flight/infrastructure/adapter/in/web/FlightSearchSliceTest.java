@@ -34,18 +34,6 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Searching a seeded catalogue, with a real database behind it.
- *
- * <p>The seed is replayed before every test. This slice only reads, so on its
- * own it would not need to — but SeatBlockSliceTest shares the cached context
- * and therefore the same database, and it writes. Without the replay, whether
- * these tests pass would depend on which class Surefire happened to run first.
- *
- * <p>The seed carries a departed flight and a sold out one on purpose. Neither
- * may ever appear in a result, and that rule lives in the Specification rather
- * than in the domain or the use case, so this is the only place it is checked.
- */
 @SpringBootTest(classes = {
         FlightController.class,
         GlobalExceptionHandler.class,
@@ -84,7 +72,6 @@ class FlightSearchSliceTest {
     private static final String SECOND_DAY = "2026-03-12";
     private static final String PAST_DAY = "2026-03-09";
 
-    /** Everything in the seed that is neither departed nor sold out. */
     private static final int BOOKABLE_FLIGHTS = 6;
     private static final int ON_THE_BOGOTA_MEDELLIN_ROUTE = 4;
     private static final int LEAVING_ON_THE_FIRST_DAY = 4;
@@ -112,11 +99,6 @@ class FlightSearchSliceTest {
     @Autowired
     private MockMvc mockMvc;
 
-    /*
-     * Pins "now" so the seed can use literal dates. Left to the wall clock the
-     * seed has to be written relative to today, and then the test and the
-     * database each have to work out what today is.
-     */
     @TestBean
     private Clock clock;
 
@@ -128,11 +110,6 @@ class FlightSearchSliceTest {
     @DisplayName("browsing the catalogue")
     class Browsing {
 
-        /*
-         * The one test that spells out the whole seed on purpose. If someone
-         * changes the catalogue, this is the test that says so, and the others
-         * are written not to.
-         */
         @Test
         @DisplayName("should answer with every bookable flight, soonest first")
         void shouldListTheBookableCatalogue() throws Exception {
@@ -211,11 +188,6 @@ class FlightSearchSliceTest {
                             .value(ON_THE_BOGOTA_MEDELLIN_ROUTE));
         }
 
-        /*
-         * The hasItem matters more than the everyItem: LA8100 leaves BOG for a
-         * different destination, so a filter that quietly kept matching the
-         * BOG-MDE route would still pass the everyItem check on its own.
-         */
         @Test
         @DisplayName("should answer everything leaving an airport when only the origin is given")
         void shouldNarrowByOriginAlone() throws Exception {
@@ -297,11 +269,6 @@ class FlightSearchSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.size").value(PAGE_SIZE));
         }
 
-        /*
-         * Comparing the two pages rather than naming the flights on the second:
-         * what paging promises is that it carries on, not that LA8100 sits in
-         * position three.
-         */
         @Test
         @DisplayName("should carry on where the previous page stopped")
         void shouldContinueOnTheNextPage() throws Exception {
