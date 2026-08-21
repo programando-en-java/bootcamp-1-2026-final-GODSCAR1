@@ -1,6 +1,5 @@
 package com.programandoenjava.airline.booking.infrastructure.adapter.out.persistence.outbox;
 
-import org.springframework.data.domain.Limit;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +38,7 @@ public class OutboxRelay {
     @Scheduled(fixedDelayString = "${airline.outbox.poll-interval:PT1S}")
     @Transactional
     public void publishPending() {
-        List<OutboxEntity> pending = outboxJpaRepository.claimPending(Limit.of(BATCH_SIZE));
+        List<OutboxEntity> pending = outboxJpaRepository.claimPending(BATCH_SIZE);
         if (pending.isEmpty()) {
             return;
         }

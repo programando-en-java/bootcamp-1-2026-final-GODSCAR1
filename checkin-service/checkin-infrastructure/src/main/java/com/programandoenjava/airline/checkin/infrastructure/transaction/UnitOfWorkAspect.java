@@ -1,5 +1,6 @@
 package com.programandoenjava.airline.checkin.infrastructure.transaction;
 
+import com.programandoenjava.airline.checkin.application.transaction.Isolation;
 import com.programandoenjava.airline.checkin.application.transaction.UnitOfWork;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -22,9 +23,17 @@ public class UnitOfWorkAspect {
                                   final UnitOfWork unitOfWork) {
         Supplier<Object> action = () -> proceed(joinPoint);
 
-        return unitOfWork.readOnly()
-                ? transactionRunner.executeReadOnly(action)
-                : transactionRunner.executeInTransaction(action);
+        boolean readOnly = unitOfWork.readOnly();
+        Isolation isolation = unitOfWork.isolation();
+
+        if (readOnly) {
+            return transactionRunner.executeReadOnly(action);
+        }
+        if (isolation == Isolation.SERIALIZABLE) {
+            return transactionRunner.executeSerializable(action);
+        }
+
+        return transactionRunner.executeInTransaction(action);
     }
 
     /*

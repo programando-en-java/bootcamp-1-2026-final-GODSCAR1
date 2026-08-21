@@ -27,6 +27,12 @@ class BoardingSequenceEntity {
         // required by JPA
     }
 
+    /** A flight nobody has checked in for yet, so nothing has been handed out. */
+    BoardingSequenceEntity(final UUID flightId) {
+        this.flightId = flightId;
+        this.lastSequence = 0;
+    }
+
     int takeNext() {
         lastSequence = lastSequence + 1;
 

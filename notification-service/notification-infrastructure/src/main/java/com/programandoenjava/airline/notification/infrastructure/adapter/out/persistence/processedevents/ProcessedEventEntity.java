@@ -16,10 +16,19 @@ class ProcessedEventEntity {
     @Column(name = "event_id")
     private UUID eventId;
 
-    @Column(name = "processed_at", nullable = false)
+    /*
+     * Filled by the column's own default rather than written from here. It is
+     * an audit column that nothing reads, and taking it from the database keeps
+     * a clock out of an adapter that has no other use for one.
+     */
+    @Column(name = "processed_at", nullable = false, insertable = false, updatable = false)
     private Instant processedAt;
 
     protected ProcessedEventEntity() {
         // required by JPA
+    }
+
+    ProcessedEventEntity(final UUID eventId) {
+        this.eventId = eventId;
     }
 }

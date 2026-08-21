@@ -54,6 +54,14 @@ public class BlockSeatsService implements BlockSeatsUseCase {
         this.clock = clock;
     }
 
+    /*
+     * Read committed on purpose, unlike the units of work that read to decide
+     * whether to write. The lock taken on the flight row is what orders two
+     * blocks on the same flight, and it orders them by making the second wait
+     * until it can see what the first wrote (ADR-007). Serialisable would abort
+     * that second one instead of letting it look, and a caller who should have
+     * been told its booking already holds seats would be told nothing useful.
+     */
     @Override
     @UnitOfWork
     public SeatsHeld block(final BlockSeatsCommand command) {
@@ -66,7 +74,9 @@ public class BlockSeatsService implements BlockSeatsUseCase {
             return new SeatsHeld(sameRequest.get(), flight.price());
         }
 
-        if (findSeatBlock.existsForBooking(command.bookingId())) {
+        boolean alreadyHolds = findSeatBlock.existsForBooking(command.bookingId());
+
+        if (alreadyHolds) {
             throw new BookingAlreadyHoldsSeatsException(command.bookingId());
         }
 

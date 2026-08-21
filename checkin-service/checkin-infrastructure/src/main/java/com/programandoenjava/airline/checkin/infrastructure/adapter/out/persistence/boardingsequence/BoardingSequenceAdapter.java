@@ -21,13 +21,22 @@ class BoardingSequenceAdapter implements NextBoardingSequencePort {
     @Override
     @Transactional
     public BoardingSequence nextFor(final FlightId flightId) {
-        boardingSequenceJpaRepository.createIfAbsent(flightId.value());
-
         BoardingSequenceEntity counter = boardingSequenceJpaRepository
                 .findByFlightForUpdate(flightId.value())
-                .orElseThrow(() -> new IllegalStateException(
-                        "No boarding sequence for flight " + flightId.value()));
+                .orElseGet(() -> create(flightId));
 
         return new BoardingSequence(counter.takeNext());
+    }
+
+    /*
+     * Two first passengers on the same flight can both find no counter. The
+     * serialisable unit of work this runs inside is what stops them both
+     * writing one, by refusing the second rather than letting it collide on the
+     * primary key.
+     */
+    private BoardingSequenceEntity create(final FlightId flightId) {
+        BoardingSequenceEntity counter = new BoardingSequenceEntity(flightId.value());
+
+        return boardingSequenceJpaRepository.save(counter);
     }
 }

@@ -46,6 +46,28 @@ class BoardingPassEntity {
         // required by JPA
     }
 
+    BoardingPassEntity(final UUID id,
+                       final UUID bookingId,
+                       final UUID passengerId,
+                       final UUID flightId,
+                       final String flightNumber,
+                       final String origin,
+                       final String destination,
+                       final Instant departureTime,
+                       final int boardingSequence,
+                       final Instant issuedAt) {
+        this.id = id;
+        this.bookingId = bookingId;
+        this.passengerId = passengerId;
+        this.flightId = flightId;
+        this.flightNumber = flightNumber;
+        this.origin = origin;
+        this.destination = destination;
+        this.departureTime = departureTime;
+        this.boardingSequence = boardingSequence;
+        this.issuedAt = issuedAt;
+    }
+
     UUID getId() {
         return id;
     }

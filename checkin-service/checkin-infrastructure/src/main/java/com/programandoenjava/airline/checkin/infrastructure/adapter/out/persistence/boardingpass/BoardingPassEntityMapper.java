@@ -13,6 +13,22 @@ final class BoardingPassEntityMapper {
     private BoardingPassEntityMapper() {
     }
 
+    static BoardingPassEntity toEntity(final BoardingPass pass) {
+        FlightSnapshot flight = pass.flight();
+
+        return new BoardingPassEntity(
+                pass.id().value(),
+                pass.bookingId().value(),
+                pass.passengerId().value(),
+                flight.flightId().value(),
+                flight.flightNumber(),
+                flight.origin(),
+                flight.destination(),
+                flight.departure(),
+                pass.sequence().value(),
+                pass.issuedAt());
+    }
+
     static BoardingPass toDomain(final BoardingPassEntity entity) {
         FlightSnapshot flight = new FlightSnapshot(
                 new FlightId(entity.getFlightId()),

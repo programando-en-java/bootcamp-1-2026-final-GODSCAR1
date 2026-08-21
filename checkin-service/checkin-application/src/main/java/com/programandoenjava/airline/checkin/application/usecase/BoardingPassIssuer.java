@@ -4,6 +4,7 @@ import com.programandoenjava.airline.checkin.application.event.CheckInCompleted;
 import com.programandoenjava.airline.checkin.application.port.out.boardingpass.NextBoardingSequencePort;
 import com.programandoenjava.airline.checkin.application.port.out.boardingpass.SaveBoardingPassPort;
 import com.programandoenjava.airline.checkin.application.port.out.events.DomainEventPublisher;
+import com.programandoenjava.airline.checkin.application.transaction.Isolation;
 import com.programandoenjava.airline.checkin.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.checkin.domain.boardingpass.BoardingPass;
 import com.programandoenjava.airline.checkin.domain.boardingpass.BoardingSequence;
@@ -44,7 +45,7 @@ public class BoardingPassIssuer {
      * number that has to be contiguous, and paying for that with a lock held
      * across every check-in on the flight would be the worse trade.
      */
-    @UnitOfWork
+    @UnitOfWork(isolation = Isolation.SERIALIZABLE)
     public BoardingPass issue(final BookingId bookingId,
                               final PassengerId passengerId,
                               final FlightSnapshot flight,

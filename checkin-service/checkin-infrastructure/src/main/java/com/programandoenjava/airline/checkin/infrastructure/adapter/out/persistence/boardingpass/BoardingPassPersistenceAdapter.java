@@ -4,7 +4,6 @@ import com.programandoenjava.airline.checkin.application.port.out.boardingpass.F
 import com.programandoenjava.airline.checkin.application.port.out.boardingpass.SaveBoardingPassPort;
 import com.programandoenjava.airline.checkin.domain.boardingpass.BoardingPass;
 import com.programandoenjava.airline.checkin.domain.boardingpass.BookingId;
-import com.programandoenjava.airline.checkin.domain.boardingpass.FlightSnapshot;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -26,32 +25,21 @@ class BoardingPassPersistenceAdapter implements FindBoardingPassPort, SaveBoardi
     @Override
     @Transactional
     public Optional<BoardingPass> saveIfNew(final BoardingPass boardingPass) {
-        int inserted = insert(boardingPass);
+        Optional<BoardingPass> alreadyIssued = findByBooking(boardingPass.bookingId());
 
-        if (inserted == 1) {
-            return Optional.empty();
+        if (alreadyIssued.isPresent()) {
+            return alreadyIssued;
         }
-        return findByBooking(boardingPass.bookingId());
+
+        BoardingPassEntity entity = BoardingPassEntityMapper.toEntity(boardingPass);
+
+        boardingPassJpaRepository.save(entity);
+
+        return Optional.empty();
     }
 
     private Optional<BoardingPass> findByBooking(final BookingId bookingId) {
         return boardingPassJpaRepository.findByBookingId(bookingId.value())
                 .map(BoardingPassEntityMapper::toDomain);
-    }
-
-    private int insert(final BoardingPass pass) {
-        FlightSnapshot flight = pass.flight();
-
-        return boardingPassJpaRepository.insertIfAbsent(
-                pass.id().value(),
-                pass.bookingId().value(),
-                pass.passengerId().value(),
-                flight.flightId().value(),
-                flight.flightNumber(),
-                flight.origin(),
-                flight.destination(),
-                flight.departure(),
-                pass.sequence().value(),
-                pass.issuedAt());
     }
 }

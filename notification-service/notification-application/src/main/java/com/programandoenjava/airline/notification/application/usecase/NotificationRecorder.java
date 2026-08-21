@@ -2,6 +2,7 @@ package com.programandoenjava.airline.notification.application.usecase;
 
 import com.programandoenjava.airline.notification.application.port.out.notifications.SaveNotificationPort;
 import com.programandoenjava.airline.notification.application.port.out.processedevents.ProcessedEventsPort;
+import com.programandoenjava.airline.notification.application.transaction.Isolation;
 import com.programandoenjava.airline.notification.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.notification.domain.notification.BookingId;
 import com.programandoenjava.airline.notification.domain.notification.Notification;
@@ -35,7 +36,7 @@ public class NotificationRecorder {
     }
 
     /** Empty when this event has already been acted on, and nothing was written. */
-    @UnitOfWork
+    @UnitOfWork(isolation = Isolation.SERIALIZABLE)
     public Optional<Notification> record(final UUID eventId,
                                          final PassengerId passengerId,
                                          final BookingId bookingId,
@@ -43,7 +44,9 @@ public class NotificationRecorder {
                                          final NotificationMessage message,
                                          final Instant now) {
 
-        if (!processedEvents.claim(eventId)) {
+        boolean claimed = processedEvents.claim(eventId);
+
+        if (!claimed) {
             return Optional.empty();
         }
 

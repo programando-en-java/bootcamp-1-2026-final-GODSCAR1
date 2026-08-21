@@ -44,7 +44,9 @@ public class FailBookingService implements FailBookingUseCase {
 
     @Override
     public void fail(final SettleBookingCommand command) {
-        if (!processedEvents.claim(command.eventId())) {
+        boolean claimed = processedEvents.claim(command.eventId());
+
+        if (!claimed) {
             return;
         }
 

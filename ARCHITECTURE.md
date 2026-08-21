@@ -25,6 +25,7 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [016](#adr-016-when-check-in-is-allowed) | Accepted | When check-in is allowed |
 | [017](#adr-017-what-a-notification-is-here) | Accepted | What a notification is here |
 | [018](#adr-018-carrying-the-passenger-in-a-payment-event) | Accepted | Carrying the passenger in a payment event |
+| [019](#adr-019-deciding-a-write-by-reading-first) | Accepted | Deciding a write by reading first |
 
 ---
 
@@ -1239,3 +1240,115 @@ difference with no reason behind it.
 - **payment-service reads a field it does not use itself.** If booking-service
   ever stops returning it, payment breaks for a reason that has nothing to do
   with payments.
+
+---
+
+## ADR-019: Deciding a write by reading first
+
+**Status:** Accepted
+
+### Context
+
+Four places in this system write a row only if it is not already there: a
+booking against its idempotency key, a boarding pass against its booking, a
+flight's boarding counter, and the `processed_events` row every consumer claims
+before acting.
+
+All four did it with one PostgreSQL statement, `INSERT ... ON CONFLICT DO
+NOTHING`, leaning on a unique constraint. Two review comments met here. The
+first asked for the `@Query` strings to become criteria queries, which is
+impossible for these: JPA has no upsert, in criteria or in JPQL. The second read
+the mechanism as optimistic locking and asked for pessimistic locking with a
+serialisable transaction instead.
+
+The second reading is not quite what was there. Optimistic locking compares a
+version and retries; a unique constraint with an upsert compares nothing and
+retries nothing. But the request points at something real: the check and the
+write are one statement precisely because, spread apart, read committed lets two
+callers read the same absence and both write.
+
+One thing the request cannot have. **The idempotency key stays.** Nothing about
+isolation can tell a double click from two people booking the same flight: they
+are two valid requests unless something says they are the same one. Serialisable
+makes them succeed one after the other, which is two bookings rather than one.
+What changes is the mechanism, not the input.
+
+### Decision
+
+**The four writes read first and then save**, with no native SQL left. Spring
+Data derives every query that remains, and the two locking reads are built with
+the criteria API and the generated metamodel.
+
+**The unit of work around them is serialisable.** `@UnitOfWork` grew an
+`isolation` attribute, satisfied by a third transaction template. PostgreSQL
+then refuses to let two of them interleave, aborting one with a serialization
+failure.
+
+**The runner retries.** Three attempts with a small back off, catching
+`ConcurrencyFailureException`. A serialization failure is not a fault, it is the
+database saying one of the two should go again, and the whole action is repeated
+so that its reads see what the winner left behind. Without this a second click
+would be answered with a 500 rather than the booking the first one made.
+
+**Retrying is only safe because a unit of work here touches one database.** All
+six in this system take persistence ports and the in process publisher, and
+nothing else. That was decided for another reason, keeping transactions off the
+network, and it is what makes repeating one harmless.
+
+**The unique constraints stay**, but their job changed. They were the mechanism;
+they are now the last line. That is a real trade and worth stating plainly: an
+annotation is now load bearing where a statement used to be. Remove
+`isolation = SERIALIZABLE` from a recorder and the two callers cross again, both
+insert, and the constraint answers the second with a `DataIntegrityViolation`
+and a 500, where the upsert used to answer with the row that was already there.
+
+A comment does not stop that, so `ConcurrentBookingTest` does: eight requests
+carrying one idempotency key, asserting one booking, no failures, and the same
+booking handed to all of them. It is the only test in that module that fails
+when the annotation goes, because one request at a time never notices its
+isolation level.
+
+The coupling did move in the right direction, and that is the other half of the
+trade. `ON CONFLICT` is PostgreSQL's spelling and it lived in a string inside a
+repository, which meant the argument for why two clicks make one booking was
+written in vendor SQL in the outermost layer. It is now written in this
+project's own vocabulary in the application layer, next to the code that depends
+on it, and Spring translates every vendor's serialization failure into the same
+exception the retry catches. What did not become portable is the behaviour:
+PostgreSQL aborts the loser where MySQL would make it wait. And the outbox relay
+still leans on SKIP LOCKED, which has no portable spelling at all.
+
+### Where this deliberately does not apply
+
+**flight-service blocks seats at read committed.** It was tried the other way
+and `ConcurrentSeatBlockTest` measured the result: eight simultaneous requests
+answered `[201, 409]` before and five 500s after.
+
+The reason is that these are two different tools. `BlockSeatsService` already
+takes a pessimistic lock on the flight row (ADR-007), and that lock orders the
+losers by making them **wait until they can see** what the winner wrote, which
+is how they know to answer 409. Serialisable aborts them instead, for having
+read something that changed. So:
+
+- **Lock pessimistically when the loser must wait and look**, which needs a row
+  that already exists to lock.
+- **Ask for serialisable when there is no row to lock**, because the decision
+  being made is whether to create it.
+
+Booking, check-in and notification have nothing to lock at that moment. Flight
+does.
+
+### Consequences
+
+- **A serialization failure that survives three attempts reaches the caller.**
+  It arrives as a 500, which is honest: at that point something is wrong beyond
+  ordinary contention.
+- **`processed_events` is claimed without a retry**, because it is not inside a
+  unit of work in booking-service: a refusal fails the listener, the broker
+  delivers again, and the second delivery finds the row. The redelivery is the
+  retry.
+- **Serialisable costs more than read committed**, and PostgreSQL can abort a
+  transaction that would have been fine. These four are short, touch few rows,
+  and are the ones where correctness is the point.
+- **`processed_at` is filled by its column default** rather than written from
+  Java, which keeps a clock out of an adapter that has no other use for one.

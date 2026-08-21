@@ -4,6 +4,7 @@ import com.programandoenjava.airline.booking.application.event.BookingCreated;
 import com.programandoenjava.airline.booking.application.port.out.events.DomainEventPublisher;
 import com.programandoenjava.airline.booking.application.port.out.savebooking.SaveBookingPort;
 import com.programandoenjava.airline.booking.application.port.shared.IdempotencyKey;
+import com.programandoenjava.airline.booking.application.transaction.Isolation;
 import com.programandoenjava.airline.booking.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
 
@@ -31,7 +32,7 @@ public class BookingRecorder {
      * request carrying the same idempotency key gets the booking that already
      * exists, and nothing new has happened to tell anyone about.
      */
-    @UnitOfWork
+    @UnitOfWork(isolation = Isolation.SERIALIZABLE)
     public Booking record(final Booking booking, final IdempotencyKey key) {
         Optional<Booking> lostTheRace = saveBooking.saveIfNew(booking, key);
         if (lostTheRace.isPresent()) {

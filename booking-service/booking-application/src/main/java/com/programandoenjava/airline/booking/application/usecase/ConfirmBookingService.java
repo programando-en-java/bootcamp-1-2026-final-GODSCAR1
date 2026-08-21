@@ -29,7 +29,9 @@ public class ConfirmBookingService implements ConfirmBookingUseCase {
 
     @Override
     public void confirm(final SettleBookingCommand command) {
-        if (!processedEvents.claim(command.eventId())) {
+        boolean claimed = processedEvents.claim(command.eventId());
+
+        if (!claimed) {
             return;
         }
 
