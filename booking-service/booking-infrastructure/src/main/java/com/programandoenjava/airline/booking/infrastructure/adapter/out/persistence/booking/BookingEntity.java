@@ -57,7 +57,32 @@ class BookingEntity {
     private Instant seatsReleasedAt;
 
     protected BookingEntity() {
-        // required by JPA
+    }
+
+    BookingEntity(final UUID id,
+                  final UUID passengerId,
+                  final UUID flightId,
+                  final UUID seatBlockId,
+                  final int seats,
+                  final BigDecimal priceAmount,
+                  final String priceCurrency,
+                  final BigDecimal totalAmount,
+                  final String totalCurrency,
+                  final BookingStatus status,
+                  final String idempotencyKey,
+                  final Instant createdAt) {
+        this.id = id;
+        this.passengerId = passengerId;
+        this.flightId = flightId;
+        this.seatBlockId = seatBlockId;
+        this.seats = seats;
+        this.priceAmount = priceAmount;
+        this.priceCurrency = priceCurrency;
+        this.totalAmount = totalAmount;
+        this.totalCurrency = totalCurrency;
+        this.status = status;
+        this.idempotencyKey = idempotencyKey;
+        this.createdAt = createdAt;
     }
 
     UUID getId() {

@@ -16,10 +16,14 @@ class ProcessedEventEntity {
     @Column(name = "event_id")
     private UUID eventId;
 
-    @Column(name = "processed_at", nullable = false)
+    @Column(name = "processed_at", nullable = false, insertable = false, updatable = false)
+    /* Filled by the column's own default, which keeps a clock out of this adapter. */
     private Instant processedAt;
 
     protected ProcessedEventEntity() {
-        // required by JPA
+    }
+
+    ProcessedEventEntity(final UUID eventId) {
+        this.eventId = eventId;
     }
 }

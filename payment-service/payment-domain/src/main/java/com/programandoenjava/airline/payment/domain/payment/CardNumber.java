@@ -4,11 +4,6 @@ import com.programandoenjava.airline.payment.domain.shared.DomainValidationExcep
 
 import java.util.regex.Pattern;
 
-/**
- * A card number that only ever gives back its last four digits. The full value
- * lives here for as long as the charge takes and is never handed out, so nothing
- * downstream can store what it must not.
- */
 public record CardNumber(String value) {
 
     private static final Pattern DIGITS = Pattern.compile("^\\d{13,19}$");
@@ -33,16 +28,11 @@ public record CardNumber(String value) {
         return value.substring(from);
     }
 
-    /** Keeps the number out of logs and stack traces. */
     @Override
     public String toString() {
         return "****" + lastFourDigits();
     }
 
-    /*
-     * The check digit every card carries. It catches a mistyped number without
-     * asking anyone, which is the whole reason it exists.
-     */
     private static boolean passesLuhn(final String digits) {
         int sum = 0;
         boolean doubling = false;

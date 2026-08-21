@@ -26,7 +26,6 @@ class OutboxEntity {
     @Column(nullable = false, length = 128)
     private String topic;
 
-    /* Stored as jsonb: queryable if it ever needs to be, and validated on write. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;
@@ -38,7 +37,6 @@ class OutboxEntity {
     private Instant publishedAt;
 
     protected OutboxEntity() {
-        // required by JPA
     }
 
     OutboxEntity(final UUID id,

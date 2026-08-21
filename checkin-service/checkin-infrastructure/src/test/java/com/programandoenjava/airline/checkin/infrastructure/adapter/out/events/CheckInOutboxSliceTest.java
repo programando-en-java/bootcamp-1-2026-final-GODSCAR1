@@ -43,15 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * What the check-in slice cannot say, because it mocks the publisher: that
- * issuing a pass leaves a message behind, and that the message shares the
- * pass's transaction.
- *
- * <p>Kafka is absent on purpose. Sending is the relay's job and has its own
- * test; this one is about the row, which is what a crash after printing would
- * otherwise lose.
- */
 @SpringBootTest(classes = {
         ApplicationConfiguration.class,
         BoardingPassPersistenceConfiguration.class,
@@ -98,18 +89,9 @@ class CheckInOutboxSliceTest {
     @MockitoBean
     private ReadFlightPort readFlightPort;
 
-    /*
-     * A spy rather than a mock: the write has to work for most tests, and be
-     * made to fail for the one that checks the two writes share a transaction.
-     */
     @MockitoSpyBean
     private SaveBoardingPassPort saveBoardingPassPort;
 
-    /*
-     * The relay is a bean of OutboxConfiguration and cannot be built without a
-     * template. Nothing here calls it: sending is its own concern, with its own
-     * test, and what this one is about is the row the listener leaves behind.
-     */
     @MockitoBean
     private KafkaTemplate<String, String> kafkaTemplate;
 
@@ -146,11 +128,6 @@ class CheckInOutboxSliceTest {
             Assertions.assertThat(topicOfTheOnlyMessage()).isEqualTo(COMPLETED_TOPIC);
         }
 
-        /*
-         * Keyed by the booking rather than by the pass, so everything this
-         * system says about one journey lands on one partition and stays in the
-         * order it happened.
-         */
         @Test
         @DisplayName("should key the message by the booking it is about")
         void shouldKeyTheMessageByTheBookingItIsAbout() {
@@ -194,10 +171,6 @@ class CheckInOutboxSliceTest {
             Assertions.assertThat(eventId).isNotBlank();
         }
 
-        /*
-         * The flight travels in full. A notification written from this must not
-         * have to call flight-service to find out which aeroplane it is about.
-         */
         @Test
         @DisplayName("should carry enough to write a notification from")
         void shouldCarryEnoughToWriteANotificationFrom() {
@@ -226,11 +199,6 @@ class CheckInOutboxSliceTest {
     @DisplayName("when the same booking checks in again")
     class Repeated {
 
-        /*
-         * The pass is not printed a second time, so nothing new happened and
-         * nothing is announced. Announcing on every request would have a
-         * passenger refreshing the page send a notification each time.
-         */
         @Test
         @DisplayName("should announce nothing the second time")
         void shouldAnnounceNothingTheSecondTime() {
@@ -248,11 +216,6 @@ class CheckInOutboxSliceTest {
     @DisplayName("when the pass cannot be written")
     class Rollback {
 
-        /*
-         * The reason the listener runs BEFORE_COMMIT. If the two writes were in
-         * separate transactions, this would announce a check-in that never
-         * happened, and nothing downstream could tell the difference.
-         */
         @Test
         @DisplayName("should announce nothing")
         void shouldAnnounceNothing() {

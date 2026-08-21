@@ -2,6 +2,7 @@ package com.programandoenjava.airline.notification.application.usecase;
 
 import com.programandoenjava.airline.notification.application.port.out.notifications.SaveNotificationPort;
 import com.programandoenjava.airline.notification.application.port.out.processedevents.ProcessedEventsPort;
+import com.programandoenjava.airline.notification.application.transaction.Isolation;
 import com.programandoenjava.airline.notification.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.notification.domain.notification.BookingId;
 import com.programandoenjava.airline.notification.domain.notification.Notification;
@@ -13,16 +14,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Claims the event and writes the notification, in one transaction. A class of
- * its own rather than a method on NotifyPassengerService, because
- * {@code @UnitOfWork} is proxy-based and does nothing when a bean calls itself.
- *
- * <p>The claim and the write share a transaction so that neither can happen
- * without the other. Sending is deliberately outside: a channel is somebody
- * else's system, and holding a database transaction open across it is the
- * mistake this codebase has avoided everywhere else.
- */
+/* A class of its own because @UnitOfWork is proxy-based and does nothing when a
+ * bean calls itself. Sending is left outside it on purpose. */
 public class NotificationRecorder {
 
     private final ProcessedEventsPort processedEvents;
@@ -34,8 +27,7 @@ public class NotificationRecorder {
         this.saveNotification = saveNotification;
     }
 
-    /** Empty when this event has already been acted on, and nothing was written. */
-    @UnitOfWork
+    @UnitOfWork(isolation = Isolation.SERIALIZABLE)
     public Optional<Notification> record(final UUID eventId,
                                          final PassengerId passengerId,
                                          final BookingId bookingId,
@@ -43,7 +35,9 @@ public class NotificationRecorder {
                                          final NotificationMessage message,
                                          final Instant now) {
 
-        if (!processedEvents.claim(eventId)) {
+        boolean claimed = processedEvents.claim(eventId);
+
+        if (!claimed) {
             return Optional.empty();
         }
 

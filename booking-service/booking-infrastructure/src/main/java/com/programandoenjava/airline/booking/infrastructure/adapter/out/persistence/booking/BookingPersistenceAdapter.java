@@ -35,20 +35,23 @@ class BookingPersistenceAdapter implements FindBookingPort, SaveBookingPort {
     @Override
     @Transactional
     public Optional<Booking> saveIfNew(final Booking booking, final IdempotencyKey key) {
-        int inserted = insert(booking, key);
+        Optional<Booking> sameRequest = findByKey(key);
 
-        if (inserted == 1) {
-            return Optional.empty();
+        if (sameRequest.isPresent()) {
+            return sameRequest;
         }
-        return findByKey(key);
+
+        BookingEntity entity = BookingEntityMapper.toEntity(booking, key);
+
+        bookingJpaRepository.save(entity);
+
+        return Optional.empty();
     }
 
-    /*
-     * Loads and mutates rather than rewriting the row, so the idempotency key
-     * and everything else the booking does not carry stay as they were.
-     */
     @Override
     @Transactional
+    /* Loads and mutates rather than rewriting the row, so the idempotency key and
+     * everything else the booking does not carry stay as they were. */
     public void updateStatus(final Booking booking) {
         BookingEntity entity = load(booking.id());
 
@@ -71,25 +74,5 @@ class BookingPersistenceAdapter implements FindBookingPort, SaveBookingPort {
     private Optional<Booking> findByKey(final IdempotencyKey key) {
         return bookingJpaRepository.findByIdempotencyKey(key.value())
                 .map(BookingEntityMapper::toDomain);
-    }
-
-    private int insert(final Booking booking, final IdempotencyKey key) {
-        String status = booking.status().name();
-        String priceCurrency = booking.pricePerSeat().currency().getCurrencyCode();
-        String totalCurrency = booking.total().currency().getCurrencyCode();
-
-        return bookingJpaRepository.insertIfAbsent(
-                booking.id().value(),
-                booking.passengerId().value(),
-                booking.flightId().value(),
-                booking.seatBlockId().value(),
-                booking.seats().value(),
-                booking.pricePerSeat().amount(),
-                priceCurrency,
-                booking.total().amount(),
-                totalCurrency,
-                status,
-                key.value(),
-                booking.createdAt());
     }
 }

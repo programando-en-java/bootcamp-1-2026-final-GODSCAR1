@@ -1,5 +1,6 @@
 package com.programandoenjava.airline.booking.infrastructure.adapter.out.persistence.booking;
 
+import com.programandoenjava.airline.booking.application.port.shared.IdempotencyKey;
 import com.programandoenjava.airline.booking.domain.booking.Booking;
 import com.programandoenjava.airline.booking.domain.booking.BookingId;
 import com.programandoenjava.airline.booking.domain.booking.FlightId;
@@ -13,6 +14,25 @@ import java.util.Currency;
 final class BookingEntityMapper {
 
     private BookingEntityMapper() {
+    }
+
+    static BookingEntity toEntity(final Booking booking, final IdempotencyKey key) {
+        String priceCurrency = booking.pricePerSeat().currency().getCurrencyCode();
+        String totalCurrency = booking.total().currency().getCurrencyCode();
+
+        return new BookingEntity(
+                booking.id().value(),
+                booking.passengerId().value(),
+                booking.flightId().value(),
+                booking.seatBlockId().value(),
+                booking.seats().value(),
+                booking.pricePerSeat().amount(),
+                priceCurrency,
+                booking.total().amount(),
+                totalCurrency,
+                booking.status(),
+                key.value(),
+                booking.createdAt());
     }
 
     static Booking toDomain(final BookingEntity entity) {

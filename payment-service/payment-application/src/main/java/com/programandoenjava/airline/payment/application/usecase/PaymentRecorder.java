@@ -7,17 +7,8 @@ import com.programandoenjava.airline.payment.application.transaction.UnitOfWork;
 import com.programandoenjava.airline.payment.domain.payment.PassengerId;
 import com.programandoenjava.airline.payment.domain.payment.Payment;
 
-/**
- * The two writes that have to happen together: the payment, and the outbox row
- * the listener adds when the event is published (ADR-001). A crash between them
- * would leave a charge nobody announced, or an announcement of a charge that
- * never landed.
- *
- * <p>A class of its own rather than a method on PayBookingService, because
- * {@code @UnitOfWork} is proxy-based and does nothing when a bean calls itself.
- * Keeping it here also keeps the transaction off the two network calls that
- * precede it.
- */
+/* A class of its own because @UnitOfWork is proxy-based and does nothing when a
+ * bean calls itself, and because it keeps the transaction off the gateway call. */
 public class PaymentRecorder {
 
     private final SavePaymentPort savePayment;

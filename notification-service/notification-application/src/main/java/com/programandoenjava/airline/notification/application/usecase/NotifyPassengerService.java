@@ -17,11 +17,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/*
- * All three stories of EPIC-05, which differ only in what the passenger is
- * told. Composing the words is the domain's job, claiming and writing is the
- * recorder's, and what is left here is the order the three happen in.
- */
 public class NotifyPassengerService implements NotifyPassengerUseCase {
 
     private final NotificationRecorder recorder;
@@ -67,12 +62,8 @@ public class NotifyPassengerService implements NotifyPassengerUseCase {
                 NotificationType.CHECK_IN_COMPLETED, message);
     }
 
-    /*
-     * Written, then sent, then marked. A crash between the write and the send
-     * leaves a notification that never went out, which the sent_at column makes
-     * findable. The other order would send one and forget it had, and the
-     * passenger would get it again on redelivery.
-     */
+    /* Written, sent, then marked. A crash in between leaves a notification nobody got,
+     * which sent_at makes findable. The other order would send it twice. */
     private void notify(final UUID eventId,
                         final PassengerId passengerId,
                         final BookingId bookingId,

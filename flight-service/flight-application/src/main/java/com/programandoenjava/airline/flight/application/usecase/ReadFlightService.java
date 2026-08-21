@@ -6,11 +6,6 @@ import com.programandoenjava.airline.flight.application.port.shared.exception.Fl
 import com.programandoenjava.airline.flight.domain.flight.Flight;
 import com.programandoenjava.airline.flight.domain.flight.FlightId;
 
-/**
- * A plain read rather than {@code byIdForUpdate}. Reading a flight to print a
- * boarding pass has no reason to wait behind a hold, and taking a write lock
- * for it would put every reader in the queue with every booking.
- */
 public class ReadFlightService implements ReadFlightUseCase {
 
     private final FindFlightPort findFlight;

@@ -1,10 +1,10 @@
 package com.programandoenjava.airline.flight.infrastructure.transaction;
 
+import com.programandoenjava.airline.flight.application.transaction.Isolation;
 import com.programandoenjava.airline.flight.application.transaction.UnitOfWork;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.function.Supplier;
@@ -19,25 +19,29 @@ public class UnitOfWorkAspect {
     }
 
     @Around("@annotation(unitOfWork)")
-    public @Nullable Object runInUnitOfWork(final ProceedingJoinPoint joinPoint, final UnitOfWork unitOfWork) {
+    public Object runInUnitOfWork(final ProceedingJoinPoint joinPoint,
+                                  final UnitOfWork unitOfWork) {
         Supplier<Object> action = () -> proceed(joinPoint);
-        return unitOfWork.readOnly()
-                ? transactionRunner.executeReadOnly(action)
-                : transactionRunner.executeInTransaction(action);
+
+        boolean readOnly = unitOfWork.readOnly();
+        Isolation isolation = unitOfWork.isolation();
+
+        if (readOnly) {
+            return transactionRunner.executeReadOnly(action);
+        }
+        if (isolation == Isolation.SERIALIZABLE) {
+            return transactionRunner.executeSerializable(action);
+        }
+
+        return transactionRunner.executeInTransaction(action);
     }
 
-    /*
-     * proceed() is declared to throw Throwable and Supplier.get() cannot. The
-     * checked branch is dead while no use case declares a checked exception, but
-     * it has to compile: UndeclaredThrowableException is what the JDK's own
-     * proxies use for exactly this, so a stack trace reads the same way.
-     */
     private static Object proceed(final ProceedingJoinPoint joinPoint) {
         try {
             return joinPoint.proceed();
-        } catch (final RuntimeException | Error unchecked) {
+        } catch (RuntimeException | Error unchecked) {
             throw unchecked;
-        } catch (final Throwable checked) {
+        } catch (Throwable checked) {
             throw new UndeclaredThrowableException(checked);
         }
     }

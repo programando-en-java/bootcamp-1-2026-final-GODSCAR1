@@ -6,11 +6,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * IATA flight designators are a two-character airline code followed by one to
- * four digits. The pattern is not something a reader can verify at a glance, so
- * the shapes that sit either side of each boundary are worth stating.
- */
 @DisplayName("Flight flightNumber")
 class FlightNumberTest {
 

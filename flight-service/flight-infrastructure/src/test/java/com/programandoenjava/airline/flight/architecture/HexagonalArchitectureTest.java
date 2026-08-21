@@ -8,9 +8,6 @@ import com.tngtech.archunit.library.Architectures;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/**
- * Architecture rules for flight-service.
- */
 @AnalyzeClasses(
         packages = "com.programandoenjava.airline.flight",
         importOptions = ImportOption.DoNotIncludeTests.class)

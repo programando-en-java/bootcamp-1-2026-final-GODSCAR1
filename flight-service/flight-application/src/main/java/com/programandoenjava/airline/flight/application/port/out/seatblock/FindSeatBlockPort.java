@@ -14,6 +14,5 @@ public interface FindSeatBlockPort {
 
     boolean existsForBooking(BookingId bookingId);
 
-    /** The flight is part of the question: a block on another flight is not found. */
     Optional<SeatBlock> byIdOnFlight(SeatBlockId id, FlightId flightId);
 }

@@ -12,18 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.UUID;
 
-/**
- * Turns the in-process event into the flat one other services read, and puts it
- * in the outbox.
- *
- * <p>BEFORE_COMMIT, so the row joins the transaction that wrote the pass.
- * AFTER_COMMIT would announce a check-in whenever the write that followed
- * failed, and lose one whenever this did (ADR-001).
- *
- * <p>The message is keyed by the booking rather than by the pass, so everything
- * this system says about one journey lands on the same partition and stays in
- * the order it happened.
- */
 class CheckInCompletedListener {
 
     private static final String AGGREGATE_TYPE = "boarding_pass";
@@ -40,6 +28,8 @@ class CheckInCompletedListener {
         this.clock = clock;
     }
 
+    /* BEFORE_COMMIT, so the row joins the transaction that caused it. AFTER_COMMIT
+     * would announce what never happened and lose what did (ADR-001). */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(final CheckInCompleted completed) {
         BoardingPass pass = completed.boardingPass();

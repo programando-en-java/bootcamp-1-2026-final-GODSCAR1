@@ -10,10 +10,6 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.http.HttpStatus;
 
-/**
- * Where the copy is taken. Everything past this point works with the snapshot,
- * so a pass is never printed from a flight that changed halfway through.
- */
 class ReadFlightFeignAdapter implements ReadFlightPort {
 
     private static final String FLIGHT_SERVICE = "flightService";

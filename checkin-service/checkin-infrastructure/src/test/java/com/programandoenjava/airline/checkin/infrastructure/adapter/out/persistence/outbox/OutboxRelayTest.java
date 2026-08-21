@@ -33,18 +33,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
 
-/**
- * The one place a message actually leaves this service.
- *
- * <p>A real broker, because what is being checked is that the broker received
- * something: a mocked template would only prove a method was called. It is also
- * the only place {@code claimPending} runs, and with it the SKIP LOCKED that
- * keeps two replicas from sending everything twice.
- *
- * <p>The broker outlives each test, so the topic holds what earlier cases left
- * on it. Every assertion here therefore names the aggregate it is about and
- * ignores the rest, rather than taking whichever message arrives first.
- */
 @SpringBootTest(classes = OutboxConfiguration.class)
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -75,14 +63,9 @@ class OutboxRelayTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /*
-     * The container rather than KafkaProperties: @ServiceConnection sets the
-     * property for beans the context builds, and this consumer is built by hand.
-     */
     @Autowired
     private KafkaContainer kafkaContainer;
 
-    /* The relay stamps published_at with this. */
     @TestBean
     private Clock clock;
 
@@ -134,10 +117,6 @@ class OutboxRelayTest {
             Assertions.assertThat(received.value()).contains("eventId");
         }
 
-        /*
-         * Keying by aggregate is what puts every message about one booking on
-         * the same partition, and with it in the order they were written.
-         */
         @Test
         @DisplayName("should key the message by the aggregate it is about")
         void shouldKeyTheMessageByTheAggregateItIsAbout() {
@@ -173,12 +152,6 @@ class OutboxRelayTest {
             Assertions.assertThat(unsentCount()).isZero();
         }
 
-        /*
-         * A second sweep must not resend what has gone. Asserted against the
-         * table rather than the topic, because the topic also holds what other
-         * tests put there, and what "sent twice" would mean is two rows going
-         * out, not two messages arriving.
-         */
         @Test
         @DisplayName("should leave nothing to send the second time round")
         void shouldLeaveNothingToSendTheSecondTimeRound() {
@@ -218,11 +191,6 @@ class OutboxRelayTest {
         return id;
     }
 
-    /*
-     * Polls in a loop and keeps only what this test is about. A consumer's first
-     * poll usually returns nothing while it is still being assigned partitions,
-     * and the ones after that return whatever else is on the topic.
-     */
     private ConsumerRecord<String, String> messageFor(final String aggregateId) {
         Instant deadline = Instant.now().plus(POLL_TIMEOUT);
 

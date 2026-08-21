@@ -46,15 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * ADR-001 said booking-service would never need an outbox, because everything
- * it could announce another service already knew. Notifications are the case
- * that breaks it: nobody but booking-service can say that a booking was made.
- *
- * <p>Kafka is absent on purpose. Sending is the relay's job and has its own
- * test; this one is about the row, which is what a crash right after the insert
- * would otherwise lose.
- */
 @SpringBootTest(classes = {
         ApplicationConfiguration.class,
         BookingPersistenceConfiguration.class,
@@ -99,29 +90,15 @@ class BookingOutboxSliceTest {
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
 
-    /*
-     * ApplicationConfiguration wires every use case booking-service has, and
-     * two of them settle a booking rather than create one. They are here so the
-     * wiring stands up; nothing in this file goes near them.
-     */
     @MockitoBean
     private ProcessedEventsPort processedEventsPort;
 
     @MockitoBean
     private ReleaseSeatsPort releaseSeatsPort;
 
-    /*
-     * A spy rather than a mock: the write has to work for most tests, and be
-     * made to fail for the one that checks the two writes share a transaction.
-     */
     @MockitoSpyBean
     private SaveBookingPort saveBookingPort;
 
-    /*
-     * The relay is a bean of OutboxConfiguration and cannot be built without a
-     * template. Nothing here calls it: sending has its own test, and what this
-     * one is about is the row the listener leaves behind.
-     */
     @MockitoBean
     private KafkaTemplate<String, String> kafkaTemplate;
 
@@ -196,11 +173,6 @@ class BookingOutboxSliceTest {
             Assertions.assertThat(eventId).isNotBlank();
         }
 
-        /*
-         * The passenger is here because a notification has to be addressed to
-         * someone, and this is the only message in the system that says who a
-         * booking belongs to.
-         */
         @Test
         @DisplayName("should name the passenger the booking belongs to")
         void shouldNameThePassengerTheBookingBelongsTo() {
@@ -239,11 +211,6 @@ class BookingOutboxSliceTest {
     @DisplayName("when the same request arrives twice")
     class Repeated {
 
-        /*
-         * The second request carries the key the first one took, so no booking
-         * is written and nothing new has happened to announce. Announcing on
-         * every request would notify a passenger each time a retry went through.
-         */
         @Test
         @DisplayName("should announce nothing the second time")
         void shouldAnnounceNothingTheSecondTime() {
@@ -264,11 +231,6 @@ class BookingOutboxSliceTest {
     @DisplayName("when the booking cannot be written")
     class Rollback {
 
-        /*
-         * The reason the listener runs BEFORE_COMMIT. In separate transactions
-         * this would announce a booking that does not exist, and a passenger
-         * would be told about something they cannot pay for.
-         */
         @Test
         @DisplayName("should announce nothing")
         void shouldAnnounceNothing() {

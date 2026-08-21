@@ -12,11 +12,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * The rule US-008 is mostly made of. Every case is written against one
- * departure and a clock moved around it, so the test reads the way the rule
- * does: a passenger arriving too early, on time, too late, or after the plane.
- */
 @DisplayName("Check-in window")
 class CheckInWindowTest {
 
@@ -43,11 +38,6 @@ class CheckInWindowTest {
                     .doesNotThrowAnyException();
         }
 
-        /*
-         * The boundaries are the whole point of a window, so both are pinned.
-         * Opening is inclusive and closing is not, which is what makes the two
-         * ends behave the same way: the moment named is inside the window.
-         */
         @Test
         @DisplayName("should let a passenger check in at the very moment it opens")
         void shouldLetAPassengerCheckInAtTheVeryMomentItOpens() {
@@ -87,10 +77,6 @@ class CheckInWindowTest {
                     .isInstanceOf(CheckInNotOpenYetException.class);
         }
 
-        /*
-         * The message carries the opening time. "Come back later" without
-         * saying when is the sort of answer that sends someone to a phone line.
-         */
         @Test
         @DisplayName("should say when it will open")
         void shouldSayWhenItWillOpen() {
@@ -119,11 +105,6 @@ class CheckInWindowTest {
                     .hasMessageContaining(CLOSING.toString());
         }
 
-        /*
-         * Closed and departed are both refusals and they are not the same one:
-         * a passenger inside this half hour has missed check-in but not the
-         * flight, and telling them the plane has gone would be a lie.
-         */
         @Test
         @DisplayName("should not call a flight departed while it is still on the ground")
         void shouldNotCallAFlightDepartedWhileItIsStillOnTheGround() {
@@ -180,11 +161,6 @@ class CheckInWindowTest {
                     .hasMessageContaining("cannot close after departure");
         }
 
-        /*
-         * A window that closes exactly at departure is allowed, and then only
-         * the departed refusal can happen. Worth having: it is the setting a
-         * demonstration reaches for when it wants check-in open until the end.
-         */
         @Test
         @DisplayName("should allow one that stays open until departure")
         void shouldAllowOneThatStaysOpenUntilDeparture() {

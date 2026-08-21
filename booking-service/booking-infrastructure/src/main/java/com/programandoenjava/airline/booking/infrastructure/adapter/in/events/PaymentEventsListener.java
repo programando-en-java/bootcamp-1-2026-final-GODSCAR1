@@ -9,14 +9,6 @@ import com.programandoenjava.airline.booking.infrastructure.adapter.in.events.dt
 import org.springframework.kafka.annotation.KafkaListener;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Where the saga comes back. One method per topic rather than one with a branch:
- * confirming and failing share nothing but the booking they name.
- *
- * <p>Nothing here decides whether it has seen a message before. The event id
- * travels into the command and the use case claims it, because what must not
- * happen twice is the work rather than the delivery.
- */
 class PaymentEventsListener {
 
     private final ConfirmBookingUseCase confirmBooking;

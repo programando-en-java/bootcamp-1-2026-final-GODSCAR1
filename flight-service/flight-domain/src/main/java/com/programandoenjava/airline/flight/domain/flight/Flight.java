@@ -30,9 +30,6 @@ public record Flight(FlightId id,
         }
     }
 
-    /**
-     * A newly scheduled flight, with every seat still for sale.
-     */
     public static Flight schedule(FlightNumber number,
                                   AirportCode origin,
                                   AirportCode destination,
@@ -47,9 +44,6 @@ public record Flight(FlightId id,
         return schedule.departsAfter(now) && seats.hasAvailability();
     }
 
-    /**
-     * Returns this flight with the given seats blocked.
-     */
     private Flight blockSeats(int count) {
         SeatInventory blocked = seats.block(count);
         return new Flight(id, flightNumber, origin, destination, schedule, blocked, price);
@@ -60,23 +54,6 @@ public record Flight(FlightId id,
         return new Flight(id, flightNumber, origin, destination, schedule, released, price);
     }
 
-    /**
-     * Takes seats off this flight for a booking.
-     *
-     * <p>Returns both the reduced flight and the block that records the claim,
-     * because a caller that kept one and dropped the other would have either
-     * lost the seats or sold them twice. Flight being immutable, discarding the
-     * returned one is a mistake the compiler cannot see.
-     *
-     * <p>The guard is departure alone rather than {@code isBookable}, which also
-     * folds in "has seats left". Letting {@code blockSeats} raise that second
-     * case keeps its message, which knows how many seats remain, instead of
-     * replacing it with a vaguer one. Anyone tempted to tidy this back into
-     * isBookable should read FlightTest.shouldRefuseMoreSeatsThanAreLeft first.
-     *
-     * @throws FlightDepartedException    if the flight has already left
-     * @throws InsufficientSeatsException if fewer seats remain than were asked for
-     */
     @SuppressWarnings("LocalCanBeFinal")
     public SeatsBlocked block(BookingId bookingId, SeatCount requested, @SuppressWarnings("LocalCanBeFinal") Instant now) {
         if (!schedule.departsAfter(now)) {

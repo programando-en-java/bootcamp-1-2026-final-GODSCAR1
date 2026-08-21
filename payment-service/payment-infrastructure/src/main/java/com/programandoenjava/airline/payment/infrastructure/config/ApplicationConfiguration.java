@@ -20,11 +20,6 @@ public class ApplicationConfiguration {
         return Clock.systemUTC();
     }
 
-    /*
-     * A bean of its own so that @UnitOfWork on record() is reached through a
-     * proxy. Folded into PayBookingService it would be a call the bean makes on
-     * itself, and no transaction would open.
-     */
     @Bean
     PaymentRecorder paymentRecorder(final SavePaymentPort savePaymentPort,
                                     final DomainEventPublisher domainEventPublisher) {

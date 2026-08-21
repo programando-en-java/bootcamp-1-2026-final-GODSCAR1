@@ -9,12 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * A pass is constructed and validated and nothing more, the way a booking is.
- * What is worth proving is that none of the things printed on it can be
- * missing, and that issuing one records the moment rather than reading a clock
- * of its own.
- */
 @DisplayName("Boarding pass")
 class BoardingPassTest {
 
@@ -51,11 +45,6 @@ class BoardingPassTest {
             Assertions.assertThat(pass.issuedAt()).isEqualTo(NOW);
         }
 
-        /*
-         * Two passes issued from the same arguments are two documents. The id
-         * is the pass's own, not derived from the booking, so nothing about it
-         * can be guessed from outside.
-         */
         @Test
         @DisplayName("should give each pass an id of its own")
         void shouldGiveEachPassAnIdOfItsOwn() {

@@ -44,14 +44,6 @@ import java.time.ZoneOffset;
 import java.util.Currency;
 import java.util.UUID;
 
-/**
- * What happens when a payment event arrives, against a real database.
- *
- * <p>No Kafka and no listener: those carry a message from one place to another,
- * and the use cases are where the deciding happens. flight-service is mocked
- * because a released hold is its business, not this one's — that the two agree
- * is what the end-to-end test is for.
- */
 @SpringBootTest(classes = {
         ApplicationConfiguration.class,
         BookingPersistenceConfiguration.class,
@@ -98,10 +90,6 @@ class SettleBookingSliceTest {
     @MockitoBean
     private ReleaseSeatsPort releaseSeatsPort;
 
-    /*
-     * Creating a booking is what announces one, and that is not what this file
-     * is about. The port is here so the wiring stands up, and nothing else.
-     */
     @MockitoBean
     private DomainEventPublisher domainEventPublisher;
 
@@ -137,10 +125,6 @@ class SettleBookingSliceTest {
             Assertions.assertThat(releasedAt(booking)).isNull();
         }
 
-        /*
-         * The delivery guarantee is at-least-once, so this is the ordinary case
-         * rather than an edge one.
-         */
         @Test
         @DisplayName("should do nothing the second time the same event arrives")
         void shouldDoNothingTheSecondTimeTheSameEventArrives() {
@@ -179,10 +163,6 @@ class SettleBookingSliceTest {
             Assertions.assertThat(statusOf(booking)).isEqualTo(FAILED);
         }
 
-        /*
-         * US-006. The hold is named by the booking, which is why the
-         * compensation lives here rather than in payment-service.
-         */
         @Test
         @DisplayName("should give the seats back to the flight they were held on")
         void shouldGiveTheSeatsBackToTheFlightTheyWereHeldOn() {
@@ -218,13 +198,6 @@ class SettleBookingSliceTest {
             Assertions.assertThat(processedCount()).isEqualTo(1);
         }
 
-        /*
-         * The order the use case works in: mark, then release. A release that
-         * throws leaves a booking that says FAILED with its seats still held,
-         * which the partial index on seats_released_at exists to find. Releasing
-         * first would leave a PENDING booking with no seats, which nothing could
-         * tell apart from one still waiting.
-         */
         @Test
         @DisplayName("should keep the booking failed even when the seats cannot go back")
         void shouldKeepTheBookingFailedEvenWhenTheSeatsCannotGoBack() {

@@ -4,15 +4,6 @@ import com.programandoenjava.airline.checkin.domain.shared.DomainValidationExcep
 
 import java.time.Instant;
 
-/**
- * What the flight said when the pass was printed, copied rather than looked up.
- * A boarding pass is a document: it records a moment, and reprinting it must
- * not depend on flight-service still answering.
- *
- * <p>The route is validated as present and no further. flight-service owns what
- * a well formed airport code is, and checking it twice would only mean two
- * places to change when it changes.
- */
 public record FlightSnapshot(FlightId flightId,
                              String flightNumber,
                              String origin,

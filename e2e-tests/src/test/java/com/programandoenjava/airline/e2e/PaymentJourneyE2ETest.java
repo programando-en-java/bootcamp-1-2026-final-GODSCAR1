@@ -24,18 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * Paying for a booking, across all three services and a broker.
- *
- * <p>This is where US-005 and US-006 are shown rather than argued. The slices
- * mock the port that carries a payment event, so until the services actually
- * speak, that booking-service acts on what payment-service announces is an
- * assumption — as is the compensation reaching flight-service.
- *
- * <p>Settling is asynchronous: the payment answers, and some time later
- * booking-service reads the message the relay sent. Every assertion about the
- * end state therefore polls rather than checking once.
- */
 @EnabledIfSystemProperty(named = "airline.e2e", matches = "true")
 @DisplayName("Paying for a booking, end to end")
 class PaymentJourneyE2ETest {
@@ -58,12 +46,6 @@ class PaymentJourneyE2ETest {
     private static final String FAILED = "FAILED";
     private static final String SUCCEEDED = "SUCCEEDED";
 
-    /*
-     * Sixty seconds since notification-service joined the stack. Eleven
-     * containers share one machine, and a consumer group's first message also
-     * waits out Kafka's initial rebalance delay. The budget is a limit on
-     * patience, not a statement about how long this should take.
-     */
     private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration BETWEEN_POLLS = Duration.ofMillis(250);
 
@@ -173,12 +155,6 @@ class PaymentJourneyE2ETest {
             Assertions.assertThat(settledStatusOf(bookingId)).isEqualTo(FAILED);
         }
 
-        /*
-         * US-006, and the reason this module exists. The release travels from a
-         * Kafka message, through booking-service, to an HTTP call on
-         * flight-service, and nothing short of the whole stack can show that it
-         * arrives.
-         */
         @Test
         @DisplayName("should give the seats back to the flight")
         void shouldGiveTheSeatsBackToTheFlight() {
@@ -311,11 +287,6 @@ class PaymentJourneyE2ETest {
         return new Answer(response.getStatusCode().value(), response.getBody());
     }
 
-    /*
-     * The payment answers before booking-service has read the message that
-     * settles the booking, so this waits for the status to stop being PENDING
-     * rather than asserting on whatever it happens to be.
-     */
     private String settledStatusOf(final String bookingId) {
         await(() -> !PENDING.equals(statusOf(bookingId)));
 
@@ -365,7 +336,6 @@ class PaymentJourneyE2ETest {
     private static RestClient client(final String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
-                /* A 4xx is an answer here, not a failure. */
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();

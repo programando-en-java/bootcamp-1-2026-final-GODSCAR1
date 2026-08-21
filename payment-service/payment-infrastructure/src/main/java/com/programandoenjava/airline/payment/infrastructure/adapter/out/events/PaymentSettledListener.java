@@ -12,18 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.UUID;
 
-/**
- * Turns the in-process event into the flat one other services read, and puts it
- * in the outbox.
- *
- * <p>BEFORE_COMMIT, so the row joins the transaction that saved the payment.
- * AFTER_COMMIT would leave a charge with nothing announcing it whenever the
- * write that followed failed (ADR-001).
- *
- * <p>The outbox id is written into the payload before it is stored, because a
- * consumer needs something stable to recognise a message it has already seen,
- * and at-least-once delivery means it will see some of them twice.
- */
 class PaymentSettledListener {
 
     private static final String AGGREGATE_TYPE = "payment";
@@ -40,6 +28,8 @@ class PaymentSettledListener {
         this.clock = clock;
     }
 
+    /* BEFORE_COMMIT, so the row joins the transaction that caused it. AFTER_COMMIT
+     * would announce what never happened and lose what did (ADR-001). */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(final PaymentSettled settled) {
         Payment payment = settled.payment();

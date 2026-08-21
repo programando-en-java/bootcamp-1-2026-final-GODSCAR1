@@ -23,11 +23,6 @@ public class CheckInController {
         this.checkInUseCase = checkInUseCase;
     }
 
-    /**
-     * Answers 201 on a repeat as well as on the first request. Checking in
-     * twice is not an error: the pass it asked for exists, which is what the
-     * caller wanted to know, and it is the same pass rather than a second one.
-     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     BoardingPassResponse checkIn(@Valid @RequestBody final CheckInRequest request) {

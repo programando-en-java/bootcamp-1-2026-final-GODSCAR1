@@ -40,20 +40,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
-/**
- * The test US-004 rests on: more passengers than seats, all arriving at once.
- *
- * <p>Everything else in this suite runs one request at a time, and a lock that
- * is never contended is indistinguishable from no lock at all. Take
- * {@code @UnitOfWork} off BlockSeatsService and every other test still passes —
- * each port call would open its own transaction, the lock would be released the
- * moment the flight was read, and in sequence nothing would notice. This is the
- * only test that would fail, which is what makes it worth its cost.
- *
- * <p>What is asserted is not "exactly four succeed" but invariants that hold
- * whatever the interleaving: seats sold never exceed the seats there were, and
- * the flight never ends up owing seats it does not have.
- */
 @SpringBootTest(classes = {
         FlightController.class,
         GlobalExceptionHandler.class,
@@ -74,16 +60,12 @@ import java.util.stream.IntStream;
 @Sql(scripts = "/db/testdata/R__seed_flights.sql",
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @DisplayName("Blocking seats under contention")
+/* The only test that fails if @UnitOfWork comes off BlockSeatsService: one request
+ * at a time never contends, so a lock that is never contended looks like no lock. */
 class ConcurrentSeatBlockTest {
 
     private static final String FLIGHT = "AV8001";
 
-    /*
-     * Eight passengers after nine seats, two each: four can be served, four
-     * cannot, and one seat is left over. The leftover matters — with an exact
-     * fit the test would pass even if the seats were handed out by luck rather
-     * than by the lock.
-     */
     private static final int SEATS_AVAILABLE = 9;
     private static final int SEATS_PER_BOOKING = 2;
     private static final int PASSENGERS = 8;
@@ -138,11 +120,6 @@ class ConcurrentSeatBlockTest {
                 .isEqualTo(SEATS_AVAILABLE - (int) seatsSold);
     }
 
-    /*
-     * The losers must be told why. A 500 here would mean the CHECK constraint
-     * caught what the lock should have, which is the database saving the
-     * application from itself rather than the application being correct.
-     */
     @Test
     @DisplayName("should answer the passengers who lost with a conflict, not a failure")
     void shouldAnswerTheLosersWithAConflict() throws Exception {
@@ -170,11 +147,7 @@ class ConcurrentSeatBlockTest {
                 .isEqualTo(granted * SEATS_PER_BOOKING);
     }
 
-    /*
-     * The latch is what makes this a race. Without it the threads start as the
-     * pool gets round to them, which on a fast machine is nearly sequential and
-     * the contention never happens.
-     */
+    /* The latch is what makes this a race: without it the pool runs them nearly in order. */
     private List<Integer> blockConcurrently() throws Exception {
         CountDownLatch startLine = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(PASSENGERS);

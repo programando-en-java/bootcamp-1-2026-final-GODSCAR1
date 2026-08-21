@@ -24,19 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * Checking in, across all four services.
- *
- * <p>This is where US-007 and US-008 stop being an assumption. The check-in
- * slice mocks both ports it reads through, so that booking-service really
- * answers with a status this service understands, and that flight-service
- * really answers with a departure it can measure a window against, is shown
- * here and nowhere else.
- *
- * <p>Departures are set relative to now rather than to fixed dates, because the
- * window is measured against the clock inside the container and nothing here
- * can pin it.
- */
 @EnabledIfSystemProperty(named = "airline.e2e", matches = "true")
 @DisplayName("Checking in, end to end")
 class CheckInJourneyE2ETest {
@@ -60,17 +47,11 @@ class CheckInJourneyE2ETest {
 
     private static final String NOT_OPEN_YET = "urn:airline:problem:check-in-not-open";
 
-    /** Inside the window: check-in opens a day before and closes an hour before. */
     private static final int HOURS_UNTIL_OPEN_DEPARTURE = 3;
     private static final int HOURS_UNTIL_DISTANT_DEPARTURE = 48;
 
-    /*
-     * Raised from 30s when notification-service joined the stack. Eleven
-     * containers share one machine, and a consumer group's first message also
-     * waits out Kafka's initial rebalance delay, so the saga can take longer to
-     * start than it does to run. The budget is a limit on patience, not a
-     * statement about how long settling should take.
-     */
+    /* Sixty seconds because eleven containers share one machine and a new consumer group
+     * waits out Kafka's initial rebalance. A limit on patience, not a target. */
     private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration BETWEEN_POLLS = Duration.ofMillis(250);
 
@@ -127,11 +108,6 @@ class CheckInJourneyE2ETest {
             Assertions.assertThat(passesFor(bookingId)).isEqualTo(1);
         }
 
-        /*
-         * The three services meeting. The number and the route come from
-         * flight-service, the passenger from booking-service, and only the
-         * boarding order is this service's own.
-         */
         @Test
         @DisplayName("should print a pass with the flight on it")
         void shouldPrintAPassWithTheFlightOnIt() {
@@ -160,10 +136,6 @@ class CheckInJourneyE2ETest {
             Assertions.assertThat(passesFor(bookingId)).isEqualTo(1);
         }
 
-        /*
-         * The outbox row is written and then sent, which is the part no slice
-         * can show: the relay has a real broker to hand it to, and marks it.
-         */
         @Test
         @DisplayName("should announce the check-in and send what it announced")
         void shouldAnnounceTheCheckInAndSendWhatItAnnounced() {
@@ -207,10 +179,6 @@ class CheckInJourneyE2ETest {
             Assertions.assertThat(answer.status()).isEqualTo(HttpStatus.CONFLICT.value());
         }
 
-        /*
-         * The window measured against a departure flight-service supplied. A
-         * slice can only show the rule against a date it made up itself.
-         */
         @Test
         @DisplayName("should refuse a flight that is still two days away")
         void shouldRefuseAFlightThatIsStillTwoDaysAway() {
@@ -315,11 +283,8 @@ class CheckInJourneyE2ETest {
         return new Answer(response.getStatusCode().value(), response.getBody());
     }
 
-    /*
-     * The payment answers before booking-service has read the message that
-     * settles the booking, so checking in immediately after paying would race
-     * the saga and refuse a booking that is about to be confirmed.
-     */
+    /* The payment answers before booking-service has read the message that settles the
+     * booking, so checking in immediately would race the saga. */
     private void awaitSettled(final String bookingId) {
         await(() -> !PENDING.equals(statusOf(bookingId)));
     }
@@ -367,7 +332,6 @@ class CheckInJourneyE2ETest {
     private static RestClient client(final String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
-                /* A 4xx is an answer here, not a failure. */
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();

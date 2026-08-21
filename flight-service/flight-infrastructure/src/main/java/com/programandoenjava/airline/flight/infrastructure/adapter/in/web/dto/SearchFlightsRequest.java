@@ -5,9 +5,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 
-/**
- * Every field is an optional query parameter, so every field is nullable.
- */
 public record SearchFlightsRequest(
 
         @Nullable String origin,

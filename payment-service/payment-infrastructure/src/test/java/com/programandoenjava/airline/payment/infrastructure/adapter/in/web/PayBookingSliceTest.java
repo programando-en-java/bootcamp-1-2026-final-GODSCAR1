@@ -42,11 +42,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/**
- * booking-service is mocked; the gateway is not. The stand-in gateway decides by
- * card number rather than by chance (ADR-013), so it is deterministic enough to
- * exercise both outcomes for real — mocking it would only prove the mock.
- */
 @SpringBootTest(classes = {
         PaymentController.class,
         GlobalExceptionHandler.class,
@@ -97,11 +92,6 @@ class PayBookingSliceTest {
     @MockitoBean
     private ReadBookingPort readBookingPort;
 
-    /*
-     * The outbox is not this slice's business. Mocking the publisher stops the
-     * listener running, and with it the Kafka machinery a web slice has no
-     * reason to start.
-     */
     @MockitoBean
     private DomainEventPublisher domainEventPublisher;
 
@@ -130,11 +120,6 @@ class PayBookingSliceTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.status").value(SUCCEEDED));
         }
 
-        /*
-         * The amount comes from the booking, not from the request. There is
-         * nowhere in the request to put one, which is the point: a caller cannot
-         * decide what it owes.
-         */
         @Test
         @DisplayName("should charge what the booking says is owed")
         void shouldChargeWhatTheBookingSaysIsOwed() throws Exception {
@@ -174,11 +159,6 @@ class PayBookingSliceTest {
     @DisplayName("when the card is declined")
     class Declined {
 
-        /*
-         * 201, not 402. The charge was attempted and the answer was no, which is
-         * a payment that happened rather than a request that failed. Its status
-         * is what says which, and it is what the saga will announce.
-         */
         @Test
         @DisplayName("should answer with a payment that failed")
         void shouldAnswerWithAPaymentThatFailed() throws Exception {
@@ -219,10 +199,6 @@ class PayBookingSliceTest {
     @DisplayName("keeping the card to itself")
     class Hiding {
 
-        /*
-         * Worth more than it looks. Add the number to the response DTO and this
-         * is the only test that would say so.
-         */
         @Test
         @DisplayName("should answer with the last four digits and nothing more")
         void shouldAnswerWithTheLastFourDigitsAndNothingMore() throws Exception {

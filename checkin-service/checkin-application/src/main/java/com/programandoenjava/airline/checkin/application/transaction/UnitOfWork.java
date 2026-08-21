@@ -6,15 +6,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Runs the annotated use case inside one transaction. Declared here and
- * satisfied in infrastructure, which is what keeps this file free of any
- * framework import (ADR-009).
- */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Documented
+/* A serialisable unit of work is run again from the start on a conflict,
+ * so it must not do anything it would be wrong to do twice. No network calls. */
 public @interface UnitOfWork {
 
     boolean readOnly() default false;
+
+    Isolation isolation() default Isolation.DEFAULT;
 }

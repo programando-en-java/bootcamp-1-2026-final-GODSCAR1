@@ -65,12 +65,6 @@ public record Booking(
                 pricePerSeat, total, BookingStatus.PENDING, now);
     }
 
-    /**
-     * Confirming a booking already confirmed returns it unchanged rather than
-     * complaining. Delivery of the payment event is at-least-once, so the
-     * consumer will see the same one twice, and a second confirmation is that
-     * event arriving again — not a mistake to report.
-     */
     public Booking confirm() {
         if (status == BookingStatus.CONFIRMED) {
             return this;
@@ -83,7 +77,6 @@ public record Booking(
         return withStatus(BookingStatus.CONFIRMED);
     }
 
-    /** Same reasoning as confirm: a repeat is the event arriving twice. */
     public Booking fail() {
         if (status == BookingStatus.FAILED) {
             return this;

@@ -5,12 +5,6 @@ import com.programandoenjava.airline.checkin.domain.boardingpass.FlightId;
 import com.programandoenjava.airline.checkin.domain.boardingpass.PassengerId;
 import com.programandoenjava.airline.checkin.domain.shared.DomainValidationException;
 
-/**
- * The little of a booking that check-in needs. The status arrives as the text
- * booking-service sent rather than an enum of our own: this service does not
- * decide what states a booking has, and an unknown one should read as "not
- * confirmed" instead of failing to deserialise.
- */
 public record BookingToCheckIn(BookingId id,
                                PassengerId passengerId,
                                FlightId flightId,

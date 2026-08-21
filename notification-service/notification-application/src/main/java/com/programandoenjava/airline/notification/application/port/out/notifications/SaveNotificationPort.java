@@ -6,6 +6,5 @@ public interface SaveNotificationPort {
 
     void save(Notification notification);
 
-    /** Records that the channel took it, once the channel has. */
     void markSent(Notification notification);
 }

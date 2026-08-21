@@ -5,11 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.transaction.PlatformTransactionManager;
 
-/**
- * EnableAspectJAutoProxy is explicit because a hand-built slice runs with
- * auto-configuration off, and without proxying the aspect never fires while the
- * tests still pass.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableAspectJAutoProxy
 public class TransactionSupportConfiguration {

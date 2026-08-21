@@ -21,21 +21,6 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Booking a flight across both services, over HTTP, against real databases.
- *
- * <p>This is the only place the Feign error decoder runs. Every other test in
- * the repository mocks the port it sits behind, so the translation from a
- * conflict out of flight-service into a conflict out of booking-service is an
- * assumption until the two actually speak — which is how a decoder that missed
- * 422 and answered 502 was found. The same goes for the idempotency key
- * travelling as a header.
- *
- * <p>The stack starts itself. What the flag decides is whether any of this runs
- * at all: two images and three containers cost about a minute, and a suite
- * people run every few minutes is worth more than one that covers a little
- * extra.
- */
 @EnabledIfSystemProperty(named = "airline.e2e", matches = "true")
 @DisplayName("Booking a flight, end to end")
 class BookingJourneyE2ETest {
@@ -66,10 +51,6 @@ class BookingJourneyE2ETest {
     private static final String FIND_SEAT_BLOCK_KEY =
             "SELECT idempotency_key FROM seat_blocks WHERE flight_id = ?";
 
-    /*
-     * Flight numbers are unique in the catalogue, so a counter keeps the tests
-     * from colliding with each other.
-     */
     private static final AtomicInteger FLIGHT_SEQUENCE = new AtomicInteger();
 
     private static RestClient bookingService;
@@ -81,10 +62,6 @@ class BookingJourneyE2ETest {
 
         bookingService = RestClient.builder()
                 .baseUrl(AirlineStack.bookingServiceUrl())
-                /*
-                 * A 4xx is an answer here, not a failure. Without this the
-                 * client throws and the test never sees the status it came for.
-                 */
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();
@@ -124,10 +101,6 @@ class BookingJourneyE2ETest {
             Assertions.assertThat(total).isEqualTo(TOTAL_FOR_TWO);
         }
 
-        /*
-         * Until the two services speak, that our key reaches theirs is an
-         * assumption. Reading it back out of their table is what settles it.
-         */
         @Test
         @DisplayName("should pass its idempotency key through to flight-service")
         void shouldPassItsIdempotencyKeyThroughToFlightService() {
@@ -177,11 +150,6 @@ class BookingJourneyE2ETest {
     @DisplayName("when flight-service refuses")
     class Refused {
 
-        /*
-         * The decoder's conflict branch. flight-service answers 409; what this
-         * checks is that booking-service says so too, rather than turning a
-         * legitimate refusal into a failure of its own.
-         */
         @Test
         @DisplayName("should answer with a conflict when the seats are gone")
         void shouldAnswerWithAConflictWhenTheSeatsAreGone() {
@@ -206,11 +174,6 @@ class BookingJourneyE2ETest {
             Assertions.assertThat(answer.status()).isEqualTo(HttpStatus.CONFLICT.value());
         }
 
-        /*
-         * The decoder's unprocessable branch, and the one that was broken: 422
-         * was arriving as a 502 because the decoder compared HttpStatus
-         * constants rather than numbers.
-         */
         @Test
         @DisplayName("should answer that a departed flight cannot be booked")
         void shouldAnswerThatADepartedFlightCannotBeBooked() {
@@ -270,11 +233,6 @@ class BookingJourneyE2ETest {
                 """.formatted(passengerId, flightId, seats);
     }
 
-    /*
-     * OffsetDateTime rather than Instant: the Postgres driver refuses to bind an
-     * Instant, since nothing in JDBC says which SQL type it should become.
-     * Hibernate maps it for the services; here the statement is raw.
-     */
     private UUID aFlightWith(final int availableSeats, final OffsetDateTime departure) {
         UUID id = UUID.randomUUID();
         int sequence = FLIGHT_SEQUENCE.incrementAndGet();

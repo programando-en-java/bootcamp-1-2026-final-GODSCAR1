@@ -10,7 +10,6 @@ public record NotificationId(UUID value) {
         return new NotificationId(UUID.randomUUID());
     }
 
-
     public NotificationId {
         if (value == null) {
             throw new DomainValidationException("A notification id is required");
