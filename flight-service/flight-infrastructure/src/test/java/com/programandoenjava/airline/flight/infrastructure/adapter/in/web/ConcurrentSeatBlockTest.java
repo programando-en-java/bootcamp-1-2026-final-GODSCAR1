@@ -5,6 +5,7 @@ import com.programandoenjava.airline.flight.TestcontainersConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.flight.FlightPersistenceConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.seatblock.SeatBlockPersistenceConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.flight.infrastructure.security.SecurityConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -46,7 +50,8 @@ import java.util.stream.IntStream;
         ApplicationConfiguration.class,
         FlightPersistenceConfiguration.class,
         SeatBlockPersistenceConfiguration.class,
-        TransactionSupportConfiguration.class
+        TransactionSupportConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -88,6 +93,9 @@ class ConcurrentSeatBlockTest {
             "UPDATE flights SET available_seats = ? WHERE flight_number = ?";
 
     private static final int TIMEOUT_SECONDS = 30;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Autowired
     private MockMvc mockMvc;
@@ -148,6 +156,11 @@ class ConcurrentSeatBlockTest {
     }
 
     /* The latch is what makes this a race: without it the pool runs them nearly in order. */
+
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor anyCaller() {
+        return SecurityMockMvcRequestPostProcessors.jwt();
+    }
+
     private List<Integer> blockConcurrently() throws Exception {
         CountDownLatch startLine = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(PASSENGERS);
@@ -185,6 +198,7 @@ class ConcurrentSeatBlockTest {
                 """.formatted(bookingId, SEATS_PER_BOOKING);
 
         return mockMvc.perform(MockMvcRequestBuilders.post(SEAT_BLOCKS, flightId())
+                        .with(anyCaller())
                         .header(IDEMPOTENCY_KEY, key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))

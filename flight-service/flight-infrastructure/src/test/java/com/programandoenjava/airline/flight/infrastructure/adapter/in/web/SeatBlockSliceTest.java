@@ -7,6 +7,7 @@ import com.programandoenjava.airline.flight.domain.seatblock.SeatCount;
 import com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.flight.FlightPersistenceConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.adapter.out.persistence.seatblock.SeatBlockPersistenceConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.flight.infrastructure.security.SecurityConfiguration;
 import com.programandoenjava.airline.flight.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
@@ -25,6 +26,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -42,7 +46,8 @@ import java.util.UUID;
         ApplicationConfiguration.class,
         FlightPersistenceConfiguration.class,
         SeatBlockPersistenceConfiguration.class,
-        TransactionSupportConfiguration.class
+        TransactionSupportConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -92,6 +97,9 @@ class SeatBlockSliceTest {
             "SELECT count(*) FROM seat_blocks";
     private static final String SET_AVAILABLE_SEATS =
             "UPDATE flights SET available_seats = ? WHERE flight_number = ?";
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Autowired
     private MockMvc mockMvc;
@@ -353,7 +361,8 @@ class SeatBlockSliceTest {
             final String unknownFlight = UUID.randomUUID().toString();
             final String seatBlockId = UUID.randomUUID().toString();
 
-            mockMvc.perform(MockMvcRequestBuilders.delete(SEAT_BLOCK, unknownFlight, seatBlockId))
+            mockMvc.perform(MockMvcRequestBuilders.delete(SEAT_BLOCK, unknownFlight, seatBlockId)
+                            .with(anyCaller()))
                     .andExpect(MockMvcResultMatchers.status().isNotFound());
         }
     }
@@ -366,6 +375,7 @@ class SeatBlockSliceTest {
         @DisplayName("should reject a request with no idempotency key")
         void shouldRejectARequestWithNoIdempotencyKey() throws Exception {
             mockMvc.perform(MockMvcRequestBuilders.post(SEAT_BLOCKS, flightIdOf(BOOKABLE))
+                            .with(anyCaller())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(bodyFor(aBooking(), SEATS_WANTED)))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
@@ -389,6 +399,7 @@ class SeatBlockSliceTest {
         @DisplayName("should reject a request with no booking")
         void shouldRejectARequestWithNoBooking() throws Exception {
             mockMvc.perform(MockMvcRequestBuilders.post(SEAT_BLOCKS, flightIdOf(BOOKABLE))
+                            .with(anyCaller())
                             .header(IDEMPOTENCY_KEY, aKey())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -412,9 +423,14 @@ class SeatBlockSliceTest {
         return JsonPath.read(body, "$.seatBlockId");
     }
 
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor anyCaller() {
+        return SecurityMockMvcRequestPostProcessors.jwt();
+    }
+
     private MockHttpServletRequestBuilder releaseRequest(final String flightNumber,
                                                          final String seatBlockId) {
-        return MockMvcRequestBuilders.delete(SEAT_BLOCK, flightIdOf(flightNumber), seatBlockId);
+        return MockMvcRequestBuilders.delete(SEAT_BLOCK, flightIdOf(flightNumber), seatBlockId)
+                .with(anyCaller());
     }
 
     private MockHttpServletRequestBuilder blockRequest(final String flightNumber,
@@ -429,6 +445,7 @@ class SeatBlockSliceTest {
                                                final int seats,
                                                final String key) {
         return MockMvcRequestBuilders.post(SEAT_BLOCKS, flightId)
+                .with(anyCaller())
                 .header(IDEMPOTENCY_KEY, key)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(bodyFor(bookingId, seats));

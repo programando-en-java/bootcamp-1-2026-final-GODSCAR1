@@ -91,6 +91,23 @@ services:
       timeout: 5s
       retries: 5
 
+  auth-db:
+    image: postgres:17-alpine
+    container_name: airline-auth-db
+    environment:
+      POSTGRES_USER: airline
+      POSTGRES_PASSWORD: airline
+      POSTGRES_DB: airline_auth
+    ports:
+      - "5438:5432"
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airline -d airline_auth" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   kafka:
     image: apache/kafka:4.1.0
     container_name: airline-kafka
@@ -124,13 +141,16 @@ services:
       retries: 15
 
   flight-service:
-    build: ./flight-service/flight-infrastructure
+    build: ./flight-service
     container_name: airline-flight
     environment:
+      # A development value. Anywhere real this comes from the environment.
+      BOOKING_SERVICE_TOKEN: ${BOOKING_SERVICE_TOKEN:-a-token-for-development}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK-SET-URI: http://auth-service:8086/.well-known/jwks.json
       SPRING_DATASOURCE_URL: jdbc:postgresql://flight-db:5432/airline_flight
-    ports:
-      - "8081:8081"
     depends_on:
+      auth-service:
+        condition: service_healthy
       flight-db:
         condition: service_healthy
     healthcheck:
@@ -141,18 +161,20 @@ services:
       retries: 10
 
   booking-service:
-    build: ./booking-service/booking-infrastructure
+    build: ./booking-service
     container_name: airline-booking
     environment:
+      BOOKING_SERVICE_TOKEN: ${BOOKING_SERVICE_TOKEN:-a-token-for-development}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK-SET-URI: http://auth-service:8086/.well-known/jwks.json
       SPRING_DATASOURCE_URL: jdbc:postgresql://booking-db:5432/airline_booking
       # airline.flight-service.url, as an environment variable. The hyphen in
       # the middle is not a typo: Spring relaxes the binding, and there is no
       # spelling without it that maps back to the same property.
       AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
       SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
-    ports:
-      - "8082:8082"
     depends_on:
+      auth-service:
+        condition: service_healthy
       booking-db:
         condition: service_healthy
       # service_healthy, not service_started: booking's first request would fail
@@ -168,15 +190,16 @@ services:
       retries: 10
 
   payment-service:
-    build: ./payment-service/payment-infrastructure
+    build: ./payment-service
     container_name: airline-payment
     environment:
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK-SET-URI: http://auth-service:8086/.well-known/jwks.json
       SPRING_DATASOURCE_URL: jdbc:postgresql://payment-db:5432/airline_payment
       AIRLINE_BOOKING-SERVICE_URL: http://booking-service:8082
       SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
-    ports:
-      - "8083:8083"
     depends_on:
+      auth-service:
+        condition: service_healthy
       payment-db:
         condition: service_healthy
       booking-service:
@@ -190,16 +213,17 @@ services:
       retries: 10
 
   checkin-service:
-    build: ./checkin-service/checkin-infrastructure
+    build: ./checkin-service
     container_name: airline-checkin
     environment:
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK-SET-URI: http://auth-service:8086/.well-known/jwks.json
       SPRING_DATASOURCE_URL: jdbc:postgresql://checkin-db:5432/airline_checkin
       AIRLINE_BOOKING-SERVICE_URL: http://booking-service:8082
       AIRLINE_FLIGHT-SERVICE_URL: http://flight-service:8081
       SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
-    ports:
-      - "8084:8084"
     depends_on:
+      auth-service:
+        condition: service_healthy
       checkin-db:
         condition: service_healthy
       kafka:
@@ -215,13 +239,11 @@ services:
       retries: 10
 
   notification-service:
-    build: ./notification-service/notification-infrastructure
+    build: ./notification-service
     container_name: airline-notification
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://notification-db:5432/airline_notification
       SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
-    ports:
-      - "8085:8085"
     depends_on:
       notification-db:
         condition: service_healthy
@@ -233,10 +255,54 @@ services:
       timeout: 5s
       retries: 10
 
+  auth-service:
+    build: ./auth-service
+    container_name: airline-auth
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/airline_auth
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8086/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: airline-gateway
+    environment:
+      AIRLINE_JWKS_URI: http://auth-service:8086/.well-known/jwks.json
+      AIRLINE_AUTH_URI: http://auth-service:8086
+      AIRLINE_FLIGHTS_URI: http://flight-service:8081
+      AIRLINE_BOOKINGS_URI: http://booking-service:8082
+      AIRLINE_PAYMENTS_URI: http://payment-service:8083
+      AIRLINE_BOARDING_PASSES_URI: http://checkin-service:8084
+    ports:
+      - "8080:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      flight-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      checkin-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   flight-db-data:
   booking-db-data:
   payment-db-data:
   checkin-db-data:
   notification-db-data:
+  auth-db-data:
   kafka-data:

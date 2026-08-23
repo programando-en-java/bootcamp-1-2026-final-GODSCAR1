@@ -5,7 +5,6 @@ brings up. They are development tooling, not tests: nothing in CI runs them, and
 nothing fails if they are never used.
 
 ```powershell
-.\mvnw.cmd -B clean package
 docker compose up -d --build --wait
 
 .\scripts\smoke-payment.ps1              # US-005: pay a booking, saga confirms it
@@ -16,6 +15,27 @@ docker compose up -d --build --wait
 
 docker compose down -v
 ```
+
+## One door
+
+Every request goes to `http://localhost:8080`. The services are no longer
+published: the gateway is the only way in, and seat blocks are not reachable
+through it at all (ADR-024).
+
+## Logging in
+
+Every call to a service needs a token now, so each script starts by logging in
+as a seeded demo account and carries the bearer from there. The passenger is
+whoever it logged in as: no request can name one any more (ADR-021).
+
+| Account | Password | Role |
+| --- | --- | --- |
+| `passenger@airline.test` | `passenger123` | PASSENGER |
+| `agent@airline.test` | `agent123` | AGENT |
+| `admin@airline.test` | `admin123` | ADMIN |
+
+They are seeded by a migration and are nobody's idea of a secret. There is no
+sign up, because no story asks for one.
 
 ## Why they exist when there is an end-to-end suite
 

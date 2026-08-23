@@ -2,7 +2,6 @@
 # booking, a payment that confirms it, the boarding pass, and the message
 # check-in puts on Kafka for whoever notifies the passenger.
 #
-#   .\mvnw.cmd -B clean package
 #   docker compose up -d --build --wait
 #   .\scripts\smoke-checkin.ps1
 #
@@ -18,12 +17,30 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Every service is behind the gateway now. Nothing else is published (ADR-024).
+$gateway = "http://localhost:8080"
+
+$authUrl       = $gateway
+$authContainer = "airline-gateway"
+$demoEmail  = "passenger@airline.test"
+$demoSecret = "passenger123"
+
+# Everything past the flight insert needs a token now. The passenger is whoever
+# this logs in as: no request can name one any more.
+function Login($email, $password) {
+    $answer = Invoke-RestMethod -Method Post -Uri "$authUrl/api/v1/auth/login" `
+        -ContentType "application/json" `
+        -Body (@{ email = $email; password = $password } | ConvertTo-Json)
+
+    return $answer.accessToken
+}
+
 $flightDb   = "airline-flight-db"
 $bookingDb  = "airline-booking-db"
 $checkinDb  = "airline-checkin-db"
-$bookingUrl = "http://localhost:8082"
-$paymentUrl = "http://localhost:8083"
-$checkinUrl = "http://localhost:8084"
+$bookingUrl = $gateway
+$paymentUrl = $gateway
+$checkinUrl = $gateway
 $kafka      = "airline-kafka"
 
 $goodCard   = "4242424242424242"
@@ -88,7 +105,14 @@ function ProblemFrom($failure) {
 # Three hours out by default, which is inside the window: check-in opens a day
 # before departure and closes an hour before it.
 
-RequireStack @($flightDb, $bookingDb, $checkinDb, $kafka)
+RequireStack @($authContainer, $flightDb, $bookingDb, $checkinDb, $kafka)
+
+Step "Logging in"
+
+$token   = Login $demoEmail $demoSecret
+$bearer  = @{ Authorization = "Bearer $token" }
+
+Write-Host "as       $demoEmail"
 
 Step "Creating a flight that leaves in $hoursAhead hours"
 
@@ -114,10 +138,9 @@ Write-Host "departs  $departure"
 Step "Creating a booking"
 
 $booking = Invoke-RestMethod -Method Post -Uri "$bookingUrl/api/v1/bookings" `
-    -Headers @{ "Idempotency-Key" = [guid]::NewGuid().ToString() } `
+    -Headers ($bearer + @{ "Idempotency-Key" = [guid]::NewGuid().ToString() }) `
     -ContentType "application/json" `
     -Body (@{
-        passengerId = [guid]::NewGuid().ToString()
         flightId    = $flightId
         seats       = $seats
     } | ConvertTo-Json)
@@ -128,6 +151,7 @@ Write-Host "status   $($booking.status)"
 Step "Paying for it"
 
 $payment = Invoke-RestMethod -Method Post -Uri "$paymentUrl/api/v1/payments" `
+    -Headers $bearer `
     -ContentType "application/json" `
     -Body (@{
         bookingId  = $booking.bookingId
@@ -161,7 +185,7 @@ $body = @{ bookingId = $booking.bookingId } | ConvertTo-Json
 
 try {
     $pass = Invoke-RestMethod -Method Post -Uri "$checkinUrl/api/v1/boarding-passes" `
-        -ContentType "application/json" -Body $body
+        -Headers $bearer -ContentType "application/json" -Body $body
 
     Write-Host "pass     $($pass.boardingPassId)"
     Write-Host "flight   $($pass.flightNumber) $($pass.origin) to $($pass.destination)"
@@ -188,7 +212,7 @@ if (-not $TooEarly) {
     Step "Checking in again"
 
     $again = Invoke-RestMethod -Method Post -Uri "$checkinUrl/api/v1/boarding-passes" `
-        -ContentType "application/json" -Body $body
+        -Headers $bearer -ContentType "application/json" -Body $body
 
     if ($again.boardingPassId -eq $pass.boardingPassId) {
         Write-Host "pass     $($again.boardingPassId), the same one" -ForegroundColor Green

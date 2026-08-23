@@ -23,6 +23,16 @@ spring:
     virtual:
       enabled: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8086/.well-known/jwks.json
+
+airline:
+  service-tokens:
+    booking-service: ${BOOKING_SERVICE_TOKEN}
+
 management:
   endpoints:
     web:

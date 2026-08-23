@@ -1,7 +1,6 @@
 # Walks a whole journey against a running stack and shows what the passenger was
 # told at each step: the booking, the payment, and the check-in.
 #
-#   .\mvnw.cmd -B clean package
 #   docker compose up -d --build --wait
 #   .\scripts\smoke-notifications.ps1
 #
@@ -15,12 +14,30 @@ param()
 
 $ErrorActionPreference = "Stop"
 
+# Every service is behind the gateway now. Nothing else is published (ADR-024).
+$gateway = "http://localhost:8080"
+
+$authUrl       = $gateway
+$authContainer = "airline-gateway"
+$demoEmail  = "passenger@airline.test"
+$demoSecret = "passenger123"
+
+# Everything past the flight insert needs a token now. The passenger is whoever
+# this logs in as: no request can name one any more.
+function Login($email, $password) {
+    $answer = Invoke-RestMethod -Method Post -Uri "$authUrl/api/v1/auth/login" `
+        -ContentType "application/json" `
+        -Body (@{ email = $email; password = $password } | ConvertTo-Json)
+
+    return $answer.accessToken
+}
+
 $flightDb       = "airline-flight-db"
 $bookingDb      = "airline-booking-db"
 $notificationDb = "airline-notification-db"
-$bookingUrl     = "http://localhost:8082"
-$paymentUrl     = "http://localhost:8083"
-$checkinUrl     = "http://localhost:8084"
+$bookingUrl     = $gateway
+$paymentUrl     = $gateway
+$checkinUrl     = $gateway
 
 $goodCard   = "4242424242424242"
 $seats      = 1
@@ -81,7 +98,14 @@ function AwaitNotification($bookingId, $type) {
 
 # --- a flight leaving inside the check-in window -----------------------------
 
-RequireStack @($flightDb, $bookingDb, $notificationDb)
+RequireStack @($authContainer, $flightDb, $bookingDb, $notificationDb)
+
+Step "Logging in"
+
+$token   = Login $demoEmail $demoSecret
+$bearer  = @{ Authorization = "Bearer $token" }
+
+Write-Host "as       $demoEmail"
 
 Step "Creating a flight that leaves in $hoursAhead hours"
 
@@ -106,10 +130,9 @@ Write-Host "flight   NT$suffix"
 Step "Booking a seat"
 
 $booking = Invoke-RestMethod -Method Post -Uri "$bookingUrl/api/v1/bookings" `
-    -Headers @{ "Idempotency-Key" = [guid]::NewGuid().ToString() } `
+    -Headers ($bearer + @{ "Idempotency-Key" = [guid]::NewGuid().ToString() }) `
     -ContentType "application/json" `
     -Body (@{
-        passengerId = [guid]::NewGuid().ToString()
         flightId    = $flightId
         seats       = $seats
     } | ConvertTo-Json)
@@ -125,6 +148,7 @@ AwaitNotification $bookingId "BOOKING_CREATED"
 Step "Paying"
 
 $payment = Invoke-RestMethod -Method Post -Uri "$paymentUrl/api/v1/payments" `
+    -Headers $bearer `
     -ContentType "application/json" `
     -Body (@{ bookingId = $bookingId; cardNumber = $goodCard } | ConvertTo-Json)
 
@@ -147,6 +171,7 @@ AwaitNotification $bookingId "PAYMENT_SUCCEEDED"
 Step "Checking in"
 
 $pass = Invoke-RestMethod -Method Post -Uri "$checkinUrl/api/v1/boarding-passes" `
+    -Headers $bearer `
     -ContentType "application/json" `
     -Body (@{ bookingId = $bookingId } | ConvertTo-Json)
 

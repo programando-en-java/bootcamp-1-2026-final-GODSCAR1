@@ -21,6 +21,8 @@ final class AirlineStack {
     private static final String PAYMENT_DB_ALIAS = "payment-db";
     private static final String CHECKIN_DB_ALIAS = "checkin-db";
     private static final String NOTIFICATION_DB_ALIAS = "notification-db";
+    private static final String AUTH_DB_ALIAS = "auth-db";
+    private static final String AUTH_ALIAS = "auth-service";
     private static final String KAFKA_ALIAS = "kafka";
     private static final String FLIGHT_ALIAS = "flight-service";
     private static final String BOOKING_ALIAS = "booking-service";
@@ -30,6 +32,9 @@ final class AirlineStack {
     private static final int PAYMENT_PORT = 8083;
     private static final int CHECKIN_PORT = 8084;
     private static final int NOTIFICATION_PORT = 8085;
+    private static final int AUTH_PORT = 8086;
+
+    private static final String SERVICE_TOKEN = "a-token-for-the-stack";
     private static final int POSTGRES_PORT = 5432;
 
     private static final String DATABASE_USER = "airline";
@@ -39,6 +44,7 @@ final class AirlineStack {
     private static final String PAYMENT_DATABASE = "airline_payment";
     private static final String CHECKIN_DATABASE = "airline_checkin";
     private static final String NOTIFICATION_DATABASE = "airline_notification";
+    private static final String AUTH_DATABASE = "airline_auth";
 
     private static final Path REPOSITORY_ROOT = Path.of("..");
     private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
@@ -55,6 +61,8 @@ final class AirlineStack {
             database(CHECKIN_DB_ALIAS, CHECKIN_DATABASE);
     private static final PostgreSQLContainer NOTIFICATION_DB =
             database(NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE);
+    private static final PostgreSQLContainer AUTH_DB =
+            database(AUTH_DB_ALIAS, AUTH_DATABASE);
 
     private static final KafkaContainer KAFKA = new KafkaContainer(KAFKA_IMAGE)
             .withNetwork(NETWORK)
@@ -65,6 +73,7 @@ final class AirlineStack {
     private static final GenericContainer<?> PAYMENT_SERVICE;
     private static final GenericContainer<?> CHECKIN_SERVICE;
     private static final GenericContainer<?> NOTIFICATION_SERVICE;
+    private static final GenericContainer<?> AUTH_SERVICE;
 
     static {
         FLIGHT_DB.start();
@@ -72,6 +81,10 @@ final class AirlineStack {
         PAYMENT_DB.start();
         CHECKIN_DB.start();
         NOTIFICATION_DB.start();
+        AUTH_DB.start();
+        AUTH_SERVICE = authService();
+        AUTH_SERVICE.start();
+
         KAFKA.start();
 
         FLIGHT_SERVICE = flightService();
@@ -106,6 +119,10 @@ final class AirlineStack {
 
     static String checkinServiceUrl() {
         return urlOf(CHECKIN_SERVICE, CHECKIN_PORT);
+    }
+
+    static String authServiceUrl() {
+        return urlOf(AUTH_SERVICE, AUTH_PORT);
     }
 
     static String notificationDatabaseUrl() {
@@ -155,9 +172,22 @@ final class AirlineStack {
                 .withDatabaseName(name);
     }
 
+    /* Where a token is checked. Pointed at the alias rather than a mapped port:
+     * this is read from inside the network, by the services and not by a test. */
+    private static String jwkSetUri() {
+        return "http://" + AUTH_ALIAS + ":" + AUTH_PORT + "/.well-known/jwks.json";
+    }
+
+    private static GenericContainer<?> authService() {
+        return service("auth-service", AUTH_PORT, AUTH_DB_ALIAS, AUTH_DATABASE)
+                .withNetworkAliases(AUTH_ALIAS)
+                .dependsOn(AUTH_DB);
+    }
+
     private static GenericContainer<?> flightService() {
-        return service("flight-service/flight-infrastructure", FLIGHT_PORT,
+        return service("flight-service", FLIGHT_PORT,
                 FLIGHT_DB_ALIAS, FLIGHT_DATABASE)
+                .withEnv("BOOKING_SERVICE_TOKEN", SERVICE_TOKEN)
                 .withNetworkAliases(FLIGHT_ALIAS)
                 .dependsOn(FLIGHT_DB);
     }
@@ -165,9 +195,10 @@ final class AirlineStack {
     private static GenericContainer<?> bookingService() {
         Map<String, String> environment = Map.of(
                 "AIRLINE_FLIGHT-SERVICE_URL", "http://" + FLIGHT_ALIAS + ":" + FLIGHT_PORT,
+                "BOOKING_SERVICE_TOKEN", SERVICE_TOKEN,
                 "SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork());
 
-        return service("booking-service/booking-infrastructure", BOOKING_PORT,
+        return service("booking-service", BOOKING_PORT,
                 BOOKING_DB_ALIAS, BOOKING_DATABASE)
                 .withNetworkAliases(BOOKING_ALIAS)
                 .withEnv(environment)
@@ -179,14 +210,14 @@ final class AirlineStack {
                 "AIRLINE_BOOKING-SERVICE_URL", "http://" + BOOKING_ALIAS + ":" + BOOKING_PORT,
                 "SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork());
 
-        return service("payment-service/payment-infrastructure", PAYMENT_PORT,
+        return service("payment-service", PAYMENT_PORT,
                 PAYMENT_DB_ALIAS, PAYMENT_DATABASE)
                 .withEnv(environment)
                 .dependsOn(PAYMENT_DB, KAFKA, BOOKING_SERVICE);
     }
 
     private static GenericContainer<?> notificationService() {
-        return service("notification-service/notification-infrastructure", NOTIFICATION_PORT,
+        return service("notification-service", NOTIFICATION_PORT,
                 NOTIFICATION_DB_ALIAS, NOTIFICATION_DATABASE)
                 .withEnv("SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork())
                 .dependsOn(NOTIFICATION_DB, KAFKA);
@@ -198,7 +229,7 @@ final class AirlineStack {
                 "AIRLINE_FLIGHT-SERVICE_URL", "http://" + FLIGHT_ALIAS + ":" + FLIGHT_PORT,
                 "SPRING_KAFKA_BOOTSTRAP-SERVERS", brokerInsideTheNetwork());
 
-        return service("checkin-service/checkin-infrastructure", CHECKIN_PORT,
+        return service("checkin-service", CHECKIN_PORT,
                 CHECKIN_DB_ALIAS, CHECKIN_DATABASE)
                 .withEnv(environment)
                 .dependsOn(CHECKIN_DB, KAFKA, BOOKING_SERVICE, FLIGHT_SERVICE);
@@ -224,6 +255,7 @@ final class AirlineStack {
                 .withEnv("SPRING_DATASOURCE_URL", url)
                 .withEnv("SPRING_DATASOURCE_USERNAME", DATABASE_USER)
                 .withEnv("SPRING_DATASOURCE_PASSWORD", DATABASE_PASSWORD)
+                .withEnv("SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK-SET-URI", jwkSetUri())
                 .waitingFor(Wait.forHttp("/actuator/health").forPort(port).forStatusCode(200))
                 .withStartupTimeout(STARTUP_TIMEOUT);
     }

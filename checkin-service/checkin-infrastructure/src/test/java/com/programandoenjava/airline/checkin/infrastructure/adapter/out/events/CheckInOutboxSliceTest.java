@@ -5,6 +5,8 @@ import com.programandoenjava.airline.checkin.EnableDatabaseTest;
 import com.programandoenjava.airline.checkin.TestcontainersConfiguration;
 import com.programandoenjava.airline.checkin.application.port.in.checkin.CheckInCommand;
 import com.programandoenjava.airline.checkin.application.port.in.checkin.CheckInUseCase;
+import com.programandoenjava.airline.checkin.application.port.shared.Caller;
+import com.programandoenjava.airline.checkin.application.port.shared.Role;
 import com.programandoenjava.airline.checkin.application.port.out.boardingpass.SaveBoardingPassPort;
 import com.programandoenjava.airline.checkin.application.port.out.readbooking.BookingToCheckIn;
 import com.programandoenjava.airline.checkin.application.port.out.readbooking.ReadBookingPort;
@@ -41,6 +43,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @SpringBootTest(classes = {
@@ -65,6 +68,8 @@ class CheckInOutboxSliceTest {
     private static final String FLIGHT_NUMBER = "AV8001";
     private static final String ORIGIN = "BOG";
     private static final String DESTINATION = "MDE";
+    private static final UUID PASSENGER = UUID.randomUUID();
+
     private static final String CONFIRMED = "CONFIRMED";
 
     private static final String COMPLETED_TOPIC = "checkin.completed.v1";
@@ -233,7 +238,8 @@ class CheckInOutboxSliceTest {
 
     private void checkIn(final UUID bookingId) {
         BookingId id = new BookingId(bookingId);
-        CheckInCommand command = new CheckInCommand(id);
+        Caller caller = new Caller(PASSENGER, Set.of(Role.PASSENGER));
+        CheckInCommand command = new CheckInCommand(id, caller);
 
         checkInUseCase.checkIn(command);
     }
@@ -241,7 +247,7 @@ class CheckInOutboxSliceTest {
     private void givenBookingIsConfirmed(final UUID bookingId, final UUID flightId) {
         BookingId booking = new BookingId(bookingId);
         FlightId flight = new FlightId(flightId);
-        PassengerId passenger = new PassengerId(UUID.randomUUID());
+        PassengerId passenger = new PassengerId(PASSENGER);
 
         BookingToCheckIn answer = new BookingToCheckIn(booking, passenger, flight, CONFIRMED);
         BDDMockito.given(readBookingPort.byId(booking)).willReturn(answer);

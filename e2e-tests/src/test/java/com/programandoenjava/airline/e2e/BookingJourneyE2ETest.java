@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -60,8 +61,11 @@ class BookingJourneyE2ETest {
     static void connect() {
         AirlineStack.start();
 
+        String bearer = logIn();
+
         bookingService = RestClient.builder()
                 .baseUrl(AirlineStack.bookingServiceUrl())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, bearer)
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();
@@ -71,6 +75,27 @@ class BookingJourneyE2ETest {
                 AirlineStack.databaseUser(),
                 AirlineStack.databasePassword());
         flightDatabase = new JdbcTemplate(dataSource);
+    }
+
+    private static final String LOGIN = "/api/v1/auth/login";
+    private static final String DEMO_EMAIL = "passenger@airline.test";
+    private static final String DEMO_PASSWORD = "passenger123";
+
+    private static String logIn() {
+        RestClient auth = RestClient.builder().baseUrl(AirlineStack.authServiceUrl()).build();
+
+        String body = """
+                {"email": "%s", "password": "%s"}
+                """.formatted(DEMO_EMAIL, DEMO_PASSWORD);
+
+        String answer = auth.post()
+                .uri(LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(String.class);
+
+        return "Bearer " + JsonPath.read(answer, "$.accessToken");
     }
 
     @Nested
@@ -226,11 +251,10 @@ class BookingJourneyE2ETest {
     }
 
     private static String bodyFor(final UUID flightId, final int seats) {
-        UUID passengerId = UUID.randomUUID();
 
         return """
-                {"passengerId": "%s", "flightId": "%s", "seats": %d}
-                """.formatted(passengerId, flightId, seats);
+                {"flightId": "%s", "seats": %d}
+                """.formatted(flightId, seats);
     }
 
     private UUID aFlightWith(final int availableSeats, final OffsetDateTime departure) {

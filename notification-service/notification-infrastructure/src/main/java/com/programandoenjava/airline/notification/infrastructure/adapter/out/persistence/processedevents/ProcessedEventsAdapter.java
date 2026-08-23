@@ -16,7 +16,6 @@ class ProcessedEventsAdapter implements ProcessedEventsPort {
 
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    /* Notifying twice is what a passenger notices, so this is claimed before any work. */
     public boolean claim(final UUID eventId) {
         boolean alreadyProcessed = processedEventsJpaRepository.existsById(eventId);
 

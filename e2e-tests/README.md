@@ -1,20 +1,22 @@
 # End-to-end tests
 
 The stack is brought up by the tests themselves: a database per service, a
-broker and the five services, built from the same Dockerfiles the compose file
+broker and the six services, built from the same Dockerfiles the compose file
 uses.
 
 ```
-./mvnw -B clean package
 ./mvnw -B verify -pl e2e-tests "-Dairline.e2e=true"
 ```
 
-The `package` first is not optional. The Dockerfiles copy a jar Maven has
-already built, so without it the images carry whatever was there before.
+No `package` first. The Dockerfiles build the jar themselves in a first stage,
+so an image can no longer carry a jar from an earlier run. The cost is that a
+run compiles inside Docker: the dependency layer is cached until a pom changes,
+but the sources are compiled again every time.
 
-The flag is what keeps these off an ordinary `./mvnw verify`. Building three
-images and starting seven containers costs a few minutes, and a suite people run
-every few minutes is worth more than one that covers a little extra.
+The flag is what keeps these off an ordinary `./mvnw verify`. Building six
+images and starting fourteen containers costs several minutes, and a suite
+people run every few minutes is worth more than one that covers a little
+extra.
 
 ## What they cover that nothing else does
 

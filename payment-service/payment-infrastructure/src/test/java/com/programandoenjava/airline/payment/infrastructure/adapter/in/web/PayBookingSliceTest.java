@@ -13,6 +13,7 @@ import com.programandoenjava.airline.payment.domain.shared.Money;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.gateway.GatewayConfiguration;
 import com.programandoenjava.airline.payment.infrastructure.adapter.out.persistence.payment.PaymentPersistenceConfiguration;
 import com.programandoenjava.airline.payment.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.payment.infrastructure.security.SecurityConfiguration;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,7 +50,8 @@ import java.util.UUID;
         GlobalExceptionHandler.class,
         ApplicationConfiguration.class,
         GatewayConfiguration.class,
-        PaymentPersistenceConfiguration.class
+        PaymentPersistenceConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -88,6 +92,9 @@ class PayBookingSliceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @MockitoBean
     private ReadBookingPort readBookingPort;
@@ -283,6 +290,7 @@ class PayBookingSliceTest {
                     """.formatted(aBooking());
 
             mockMvc.perform(MockMvcRequestBuilders.post(PAYMENTS)
+                            .with(anyCaller())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
@@ -296,6 +304,7 @@ class PayBookingSliceTest {
                     """.formatted(GOOD_CARD);
 
             mockMvc.perform(MockMvcRequestBuilders.post(PAYMENTS)
+                            .with(anyCaller())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
@@ -323,12 +332,17 @@ class PayBookingSliceTest {
         BDDMockito.given(readBookingPort.byId(BDDMockito.any())).willReturn(booking);
     }
 
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor anyCaller() {
+        return SecurityMockMvcRequestPostProcessors.jwt();
+    }
+
     private MockHttpServletRequestBuilder pay(final UUID bookingId, final String cardNumber) {
         String body = """
                 {"bookingId": "%s", "cardNumber": "%s"}
                 """.formatted(bookingId, cardNumber);
 
         return MockMvcRequestBuilders.post(PAYMENTS)
+                .with(anyCaller())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body);
     }

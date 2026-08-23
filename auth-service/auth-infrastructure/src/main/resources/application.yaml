@@ -1,0 +1,37 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5438/airline_auth
+    username: airline
+    password: airline
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  threads:
+    virtual:
+      enabled: true
+
+airline:
+  auth:
+    issuer: airline-auth
+    token-lifetime: PT1H
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
