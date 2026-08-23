@@ -5,7 +5,10 @@ import com.programandoenjava.airline.checkin.application.port.in.checkin.CheckIn
 import com.programandoenjava.airline.checkin.domain.boardingpass.BoardingPass;
 import com.programandoenjava.airline.checkin.infrastructure.adapter.in.web.dto.BoardingPassResponse;
 import com.programandoenjava.airline.checkin.infrastructure.adapter.in.web.dto.CheckInRequest;
+import com.programandoenjava.airline.checkin.application.port.shared.Caller;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,8 +28,11 @@ public class CheckInController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    BoardingPassResponse checkIn(@Valid @RequestBody final CheckInRequest request) {
-        CheckInCommand command = CheckInRequestMapper.toCommand(request);
+    BoardingPassResponse checkIn(@AuthenticationPrincipal final Jwt token,
+                                 @Valid @RequestBody final CheckInRequest request) {
+        Caller caller = CallerFromToken.of(token);
+
+        CheckInCommand command = CheckInRequestMapper.toCommand(request, caller);
 
         BoardingPass pass = checkInUseCase.checkIn(command);
 

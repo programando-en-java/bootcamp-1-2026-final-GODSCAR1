@@ -51,6 +51,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
+    /* Also what a booking belonging to somebody else is answered with. */
     @ExceptionHandler(BookingNotFoundException.class)
     ProblemDetail handleBookingNotFound(final BookingNotFoundException exception) {
         return problem(HttpStatus.NOT_FOUND, "Booking not found",

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -85,9 +86,11 @@ class NotificationJourneyE2ETest {
     static void connect() {
         AirlineStack.start();
 
-        bookingService = client(AirlineStack.bookingServiceUrl());
-        paymentService = client(AirlineStack.paymentServiceUrl());
-        checkinService = client(AirlineStack.checkinServiceUrl());
+        String bearer = logIn();
+
+        bookingService = client(AirlineStack.bookingServiceUrl(), bearer);
+        paymentService = client(AirlineStack.paymentServiceUrl(), bearer);
+        checkinService = client(AirlineStack.checkinServiceUrl(), bearer);
 
         flightDatabase = database(AirlineStack.flightDatabaseUrl());
         bookingDatabase = database(AirlineStack.bookingDatabaseUrl());
@@ -230,8 +233,8 @@ class NotificationJourneyE2ETest {
 
     private String aBookingOn(final UUID flightId) {
         String body = """
-                {"passengerId": "%s", "flightId": "%s", "seats": %d}
-                """.formatted(UUID.randomUUID(), flightId, SEATS_WANTED);
+                {"flightId": "%s", "seats": %d}
+                """.formatted(flightId, SEATS_WANTED);
 
         ResponseEntity<String> response = bookingService.post()
                 .uri(BOOKINGS)
@@ -339,9 +342,31 @@ class NotificationJourneyE2ETest {
                 FIND_BODY_FOR, String.class, UUID.fromString(bookingId), type);
     }
 
-    private static RestClient client(final String baseUrl) {
+    private static final String LOGIN = "/api/v1/auth/login";
+    private static final String DEMO_EMAIL = "passenger@airline.test";
+    private static final String DEMO_PASSWORD = "passenger123";
+
+    private static String logIn() {
+        RestClient auth = RestClient.builder().baseUrl(AirlineStack.authServiceUrl()).build();
+
+        String body = """
+                {"email": "%s", "password": "%s"}
+                """.formatted(DEMO_EMAIL, DEMO_PASSWORD);
+
+        String answer = auth.post()
+                .uri(LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(String.class);
+
+        return "Bearer " + JsonPath.read(answer, "$.accessToken");
+    }
+
+    private static RestClient client(final String baseUrl, final String bearer) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, bearer)
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
                 })
                 .build();

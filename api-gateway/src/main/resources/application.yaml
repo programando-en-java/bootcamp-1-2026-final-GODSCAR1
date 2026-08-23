@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AIRLINE_JWKS_URI:http://localhost:8086/.well-known/jwks.json}
+
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          # Each destination is a named placeholder, never an indexed override.
+          # Setting spring.cloud.gateway...routes[0].uri from the environment
+          # appends a route rather than replacing one, and a route with a uri and
+          # no id does not start.
+          routes:
+            - id: auth
+              uri: ${AIRLINE_AUTH_URI:http://localhost:8086}
+              predicates:
+                - Path=/api/v1/auth/**
+
+            - id: flights
+              uri: ${AIRLINE_FLIGHTS_URI:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/flights/**
+
+            - id: bookings
+              uri: ${AIRLINE_BOOKINGS_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/bookings/**
+
+            - id: payments
+              uri: ${AIRLINE_PAYMENTS_URI:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/payments/**
+
+            - id: boarding-passes
+              uri: ${AIRLINE_BOARDING_PASSES_URI:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/boarding-passes/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

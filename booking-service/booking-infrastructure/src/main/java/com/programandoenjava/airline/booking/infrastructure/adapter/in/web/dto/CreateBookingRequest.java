@@ -6,10 +6,9 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
+/* No passengerId. Whoever the token says is asking is whose booking this is,
+ * and a caller can no longer name somebody else. */
 public record CreateBookingRequest(
-
-        @NotNull(message = "A passenger must be named")
-        UUID passengerId,
 
         @NotNull(message = "A flight must be named")
         UUID flightId,

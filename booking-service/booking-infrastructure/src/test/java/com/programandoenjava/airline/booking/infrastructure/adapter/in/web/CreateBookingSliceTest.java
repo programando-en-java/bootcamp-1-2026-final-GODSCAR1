@@ -14,6 +14,7 @@ import com.programandoenjava.airline.booking.domain.booking.SeatBlockId;
 import com.programandoenjava.airline.booking.domain.shared.Money;
 import com.programandoenjava.airline.booking.infrastructure.adapter.out.persistence.booking.BookingPersistenceConfiguration;
 import com.programandoenjava.airline.booking.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.booking.infrastructure.security.SecurityConfiguration;
 import com.programandoenjava.airline.booking.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
@@ -34,6 +35,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,7 +56,8 @@ import java.util.UUID;
         GlobalExceptionHandler.class,
         ApplicationConfiguration.class,
         BookingPersistenceConfiguration.class,
-        TransactionSupportConfiguration.class
+        TransactionSupportConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -95,6 +99,9 @@ class CreateBookingSliceTest {
 
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @MockitoBean
     private ProcessedEventsPort processedEventsPort;
@@ -288,7 +295,7 @@ class CreateBookingSliceTest {
             givenSeatsAreHeld();
             String bookingId = makeABooking(passenger, flight);
 
-            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, bookingId))
+            mockMvc.perform(as(passenger, MockMvcRequestBuilders.get(ONE_BOOKING, bookingId)))
                     .andExpect(MockMvcResultMatchers.status().isOk())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.bookingId").value(bookingId))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.passengerId")
@@ -302,9 +309,10 @@ class CreateBookingSliceTest {
         @DisplayName("should answer with what is owed and whether it is still owed")
         void shouldAnswerWithWhatIsOwedAndWhetherItIsStillOwed() throws Exception {
             givenSeatsAreHeld();
-            String bookingId = makeABooking(aPassenger(), aFlight());
+            UUID passenger = aPassenger();
+            String bookingId = makeABooking(passenger, aFlight());
 
-            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, bookingId))
+            mockMvc.perform(as(passenger, MockMvcRequestBuilders.get(ONE_BOOKING, bookingId)))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.total")
                             .value(Matchers.closeTo(TOTAL_FOR_TWO, A_CENT)))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.currency").value(COP))
@@ -316,7 +324,7 @@ class CreateBookingSliceTest {
         void shouldAnswerNothingForABookingThatDoesNotExist() throws Exception {
             UUID unknown = UUID.randomUUID();
 
-            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, unknown))
+            mockMvc.perform(asAnyone(MockMvcRequestBuilders.get(ONE_BOOKING, unknown)))
                     .andExpect(MockMvcResultMatchers.status().isNotFound())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.title")
                             .value("Booking not found"));
@@ -325,7 +333,7 @@ class CreateBookingSliceTest {
         @Test
         @DisplayName("should reject an id that is not a uuid")
         void shouldRejectAnIdThatIsNotAUuid() throws Exception {
-            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, "not-a-uuid"))
+            mockMvc.perform(asAnyone(MockMvcRequestBuilders.get(ONE_BOOKING, "not-a-uuid")))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
         }
     }
@@ -337,9 +345,9 @@ class CreateBookingSliceTest {
         @Test
         @DisplayName("should reject a request with no idempotency key")
         void shouldRejectARequestWithNoIdempotencyKey() throws Exception {
-            String body = bodyFor(aPassenger(), aFlight(), SEATS_WANTED);
+            String body = bodyFor(aFlight(), SEATS_WANTED);
 
-            mockMvc.perform(MockMvcRequestBuilders.post(BOOKINGS)
+            mockMvc.perform(asAnyone(MockMvcRequestBuilders.post(BOOKINGS))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
@@ -360,8 +368,8 @@ class CreateBookingSliceTest {
         }
 
         @Test
-        @DisplayName("should reject a request with no passenger")
-        void shouldRejectARequestWithNoPassenger() throws Exception {
+        @DisplayName("should refuse a request that carries no token")
+        void shouldRefuseARequestThatCarriesNoToken() throws Exception {
             String body = """
                     {"flightId": "%s", "seats": %d}
                     """.formatted(aFlight(), SEATS_WANTED);
@@ -370,7 +378,14 @@ class CreateBookingSliceTest {
                             .header(IDEMPOTENCY_KEY, aKey())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
-                    .andExpect(MockMvcResultMatchers.status().isBadRequest());
+                    .andExpect(MockMvcResultMatchers.status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("should refuse to read a booking without a token")
+        void shouldRefuseToReadABookingWithoutAToken() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders.get(ONE_BOOKING, UUID.randomUUID()))
+                    .andExpect(MockMvcResultMatchers.status().isUnauthorized());
         }
 
         @Test
@@ -419,18 +434,38 @@ class CreateBookingSliceTest {
                                                   final UUID flightId,
                                                   final int seats,
                                                   final String key) {
-        String body = bodyFor(passengerId, flightId, seats);
+        String body = bodyFor(flightId, seats);
 
         return MockMvcRequestBuilders.post(BOOKINGS)
+                .with(as(passengerId))
                 .header(IDEMPOTENCY_KEY, key)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body);
     }
 
-    private static String bodyFor(final UUID passengerId, final UUID flightId, final int seats) {
+    private static MockHttpServletRequestBuilder asAnyone(
+            final MockHttpServletRequestBuilder request) {
+
+        return request.with(as(UUID.randomUUID()));
+    }
+
+    private static MockHttpServletRequestBuilder as(final UUID passengerId,
+                                                    final MockHttpServletRequestBuilder request) {
+
+        return request.with(as(passengerId));
+    }
+
+    private static String bodyFor(final UUID flightId, final int seats) {
         return """
-                {"passengerId": "%s", "flightId": "%s", "seats": %d}
-                """.formatted(passengerId, flightId, seats);
+                {"flightId": "%s", "seats": %d}
+                """.formatted(flightId, seats);
+    }
+
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor as(
+            final UUID passengerId) {
+
+        return SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(token -> token.subject(passengerId.toString()));
     }
 
     private long bookingCount() {

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.programandoenjava.airline</groupId>
+    <artifactId>auth-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <!-- Required: a module with <modules> cannot be packaged as a jar. -->
+    <packaging>pom</packaging>
+
+    <name>auth-service</name>
+    <description>Who a caller is, and what they may do</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Boot 4's BOM does not manage this one, so the version lives here. -->
+        <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
+    </properties>
+
+    <modules>
+        <module>auth-domain</module>
+        <module>auth-application</module>
+        <module>auth-infrastructure</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.programandoenjava.airline</groupId>
+                <artifactId>auth-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.programandoenjava.airline</groupId>
+                <artifactId>auth-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>${nimbus-jose-jwt.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

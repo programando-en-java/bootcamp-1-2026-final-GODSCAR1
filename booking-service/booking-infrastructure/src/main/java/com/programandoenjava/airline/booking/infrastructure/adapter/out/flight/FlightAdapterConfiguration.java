@@ -2,11 +2,18 @@ package com.programandoenjava.airline.booking.infrastructure.adapter.out.flight;
 
 import com.programandoenjava.airline.booking.application.port.out.holdseats.HoldSeatsPort;
 import com.programandoenjava.airline.booking.application.port.out.releaseseats.ReleaseSeatsPort;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class FlightAdapterConfiguration {
+
+    @Bean
+    BearerTokenRelay bearerTokenRelay(
+            @Value("${airline.service-token}") final String serviceToken) {
+        return new BearerTokenRelay(serviceToken);
+    }
 
     @Bean
     HoldSeatsPort holdSeatsPort(final FlightClient flightClient) {

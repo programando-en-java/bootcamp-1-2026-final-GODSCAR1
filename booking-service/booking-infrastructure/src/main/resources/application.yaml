@@ -38,7 +38,18 @@ spring:
       # acks=all is what makes that answer mean something.
       acks: all
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # The published half of auth-service's key. Fetched once and cached, so
+          # auth-service being down does not stop this one verifying tokens.
+          jwk-set-uri: http://localhost:8086/.well-known/jwks.json
+
 airline:
+  # No default on purpose: without it the service refuses to start, which beats
+  # starting with a secret somebody guessed from the repository.
+  service-token: ${BOOKING_SERVICE_TOKEN}
   flight-service:
     url: http://localhost:8081
   outbox:

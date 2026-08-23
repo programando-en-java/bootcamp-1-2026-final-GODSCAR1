@@ -18,6 +18,8 @@
         <module>payment-service</module>
         <module>checkin-service</module>
         <module>notification-service</module>
+        <module>auth-service</module>
+        <module>api-gateway</module>
         <module>e2e-tests</module>
     </modules>
 

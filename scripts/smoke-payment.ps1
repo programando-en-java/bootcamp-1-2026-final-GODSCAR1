@@ -2,11 +2,10 @@
 # payment, the message it puts on Kafka, and what booking-service does when it
 # reads that message.
 #
-#   .\mvnw.cmd -B clean package
 #   docker compose up -d --build --wait
 #   .\scripts\smoke-payment.ps1
 #
-# Pass -Decline to use the card the gateway refuses, which is the US-006 path:
+# Pass -Decline to use the card the payment gateway refuses, which is the US-006 path:
 # the booking should end up FAILED and the seats should go back on the flight.
 
 # CmdletBinding, so PowerShell refuses a switch this script does not have
@@ -18,10 +17,28 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Every service is behind the gateway now. Nothing else is published (ADR-024).
+$gateway = "http://localhost:8080"
+
+$authUrl       = $gateway
+$authContainer = "airline-gateway"
+$demoEmail  = "passenger@airline.test"
+$demoSecret = "passenger123"
+
+# Everything past the flight insert needs a token now. The passenger is whoever
+# this logs in as: no request can name one any more.
+function Login($email, $password) {
+    $answer = Invoke-RestMethod -Method Post -Uri "$authUrl/api/v1/auth/login" `
+        -ContentType "application/json" `
+        -Body (@{ email = $email; password = $password } | ConvertTo-Json)
+
+    return $answer.accessToken
+}
+
 $flightDb      = "airline-flight-db"
 $bookingDb     = "airline-booking-db"
-$bookingUrl    = "http://localhost:8082"
-$paymentUrl    = "http://localhost:8083"
+$bookingUrl    = $gateway
+$paymentUrl    = $gateway
 $kafka         = "airline-kafka"
 
 $goodCard      = "4242424242424242"
@@ -67,7 +84,14 @@ function Exec($container, $database, $sql) {
 # There is no API for creating one, and a running instance starts with an empty
 # catalogue, so it goes straight into flight-service's own database.
 
-RequireStack @($flightDb, $bookingDb, $kafka)
+RequireStack @($authContainer, $flightDb, $bookingDb, $kafka)
+
+Step "Logging in"
+
+$token   = Login $demoEmail $demoSecret
+$bearer  = @{ Authorization = "Bearer $token" }
+
+Write-Host "as       $demoEmail"
 
 Step "Creating a flight"
 
@@ -92,10 +116,9 @@ Write-Host "flight   $flightId (SM$suffix), $capacity seats"
 Step "Creating a booking"
 
 $booking = Invoke-RestMethod -Method Post -Uri "$bookingUrl/api/v1/bookings" `
-    -Headers @{ "Idempotency-Key" = [guid]::NewGuid().ToString() } `
+    -Headers ($bearer + @{ "Idempotency-Key" = [guid]::NewGuid().ToString() }) `
     -ContentType "application/json" `
     -Body (@{
-        passengerId = [guid]::NewGuid().ToString()
         flightId    = $flightId
         seats       = $seats
     } | ConvertTo-Json)
@@ -114,6 +137,7 @@ Write-Host "seats    $heldSeats left on the flight"
 Step "Paying with $card"
 
 $payment = Invoke-RestMethod -Method Post -Uri "$paymentUrl/api/v1/payments" `
+    -Headers $bearer `
     -ContentType "application/json" `
     -Body (@{
         bookingId  = $booking.bookingId

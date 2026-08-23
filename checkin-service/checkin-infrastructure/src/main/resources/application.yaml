@@ -31,6 +31,12 @@ spring:
       # acks=all is what makes that answer mean something.
       acks: all
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8086/.well-known/jwks.json
+
 airline:
   booking-service:
     url: http://localhost:8082

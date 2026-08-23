@@ -26,6 +26,11 @@ Records marked **Open** are not yet decided and are pending discussion.
 | [017](#adr-017-what-a-notification-is-here) | Accepted | What a notification is here |
 | [018](#adr-018-carrying-the-passenger-in-a-payment-event) | Accepted | Carrying the passenger in a payment event |
 | [019](#adr-019-deciding-a-write-by-reading-first) | Accepted | Deciding a write by reading first |
+| [020](#adr-020-who-issues-tokens-and-what-signs-them) | Accepted | Who issues tokens, and what signs them |
+| [021](#adr-021-the-passenger-comes-from-the-token) | Accepted | The passenger comes from the token |
+| [022](#adr-022-a-booking-that-is-not-yours-does-not-exist) | Accepted | A booking that is not yours does not exist |
+| [023](#adr-023-calling-with-no-user-behind-it) | Accepted | Calling with no user behind it |
+| [024](#adr-024-one-door-in) | Accepted | One door in |
 
 ---
 
@@ -1352,3 +1357,239 @@ does.
   and are the ones where correctness is the point.
 - **`processed_at` is filled by its column default** rather than written from
   Java, which keeps a clock out of an adapter that has no other use for one.
+
+---
+
+## ADR-020: Who issues tokens, and what signs them
+
+**Status:** Accepted
+
+### Context
+
+EPIC-06 needs somewhere for users, passwords and roles to live, and something
+to hand out tokens. The obvious shortcut is to put both in whatever validates
+them.
+
+### Decision
+
+**A sixth service, auth-service, and nothing else issues.** Issuing and
+validating are opposite jobs: validating happens on every request, is stateless
+and needs no database; issuing happens once at login and needs users, hashes and
+roles. Putting them together would give a database to the one component that
+should scale without one.
+
+**RS256, not a shared secret.** The private key never leaves auth-service, so
+the other services can check a token and none of them can make one. With an HMAC
+secret, anything that validates can also sign, and one compromised service mints
+tokens for any role.
+
+**The key pair is generated at startup and only its public half is published**,
+at `/.well-known/jwks.json`. No private key is ever committed. Each service
+fetches the key once and caches it, so auth-service is not on the path of any
+request except a login.
+
+**No sign up.** Three accounts, one per role, are seeded by a migration. No
+story asks for registration, and the credentials are written down in
+`scripts/README.md` because they are demonstration accounts and not a secret.
+
+### Consequences
+
+- **A restart of auth-service invalidates every token already handed out**, and
+  everyone logs in again. That is the price of not committing a key.
+- **Two more containers**, with the database. The end-to-end stack went from
+  eleven to fourteen.
+- **auth-service being down does not stop anyone working**, only logging in,
+  because the keys are already cached.
+- **BCrypt hashes are compared even when the email is unknown**, so the time a
+  refusal takes does not say which addresses have accounts. Both refusals are
+  also the same message, for the same reason.
+
+---
+
+## ADR-021: The passenger comes from the token
+
+**Status:** Accepted
+
+### Context
+
+`POST /api/v1/bookings` took a `passengerId` in its body. Anybody could book as
+anybody. Three earlier records name this as a known gap: the boarding pass shows
+a uuid, the notification is addressed to a uuid, and nobody checks whose booking
+it is.
+
+### Decision
+
+**The field is gone.** The controller reads the subject of the token and the
+body carries the flight and the seats. A caller cannot name a passenger because
+there is nowhere left to write one.
+
+**The identity enters at the adapter**, like any other request datum. No new
+port, and the application layer still imports nothing from a framework.
+
+**Services carry the caller's token onward.** A Feign interceptor copies it, so
+the identity that arrived at booking reaches flight, and the one that arrived at
+payment reaches booking. That is what makes an ownership rule possible in the
+service that owns the data, which is the only place it can live.
+
+### Consequences
+
+- **Paying for somebody else's booking stopped working**, and nobody wrote that
+  rule. payment reads the booking with the payer's token, and booking answers
+  according to whose it is.
+- **The scripts and the end-to-end tests log in first.** The passenger on every
+  booking they make is the seeded demo account.
+- **A token has a lifetime and a saga does not.** Nothing here runs long enough
+  for that to bite, and if it ever does, the answer is a refresh and not a
+  longer token.
+
+---
+
+## ADR-022: A booking that is not yours does not exist
+
+**Status:** Accepted
+
+### Context
+
+US-013 asks that users reach only what they are allowed to. A gateway can decide
+that a role may call an endpoint; it cannot decide that this booking is yours,
+because it does not have the data. So the rule lives in booking-service and in
+checkin-service, which do.
+
+The question is what to answer.
+
+### Decision
+
+**404, not 403.** A refusal confirms the booking is real, and an endpoint that
+says which ids exist is a list of other people's bookings waiting to be walked.
+A booking that is not yours is answered exactly as one that was never made.
+
+**Staff are the exception.** `AGENT` and `ADMIN` see what is not theirs, which
+is what the README says they are for.
+
+**Check-in checks the pass it already issued, too.** Its fast path answers with
+an existing boarding pass without ever reading the booking, so without a check
+there a booking id alone would have been enough to read somebody else's pass.
+That was found while writing the rule, not while designing it.
+
+### Consequences
+
+- **A passenger cannot tell a typo from somebody else's booking.** Both are
+  "no such booking", which is the point.
+- **Support has to use a staff account** to look at anything.
+- **The rule is enforced twice on the check-in path**: once by checkin-service
+  and again by booking-service answering its read. Deliberate, so neither
+  depends on the other being right.
+
+---
+
+## ADR-023: Calling with no user behind it
+
+**Status:** Accepted
+
+### Context
+
+Every call between services carries the caller's token (ADR-021), which works
+because every one of them starts from somebody's request. One does not.
+
+When a payment is refused, booking-service consumes `payment.failed.v1` and
+calls flight-service to give the seats back. That work starts from a Kafka
+message: there is no request, no security context and no token to carry. Once
+seat blocks required authentication, the call went out bare and was refused, and
+the seats were never returned. The end-to-end suite found it: three tests in the
+refused-payment path stopped finishing.
+
+Two ways out were weighed. Choreographing the compensation, so booking publishes
+and flight consumes, removes the HTTP call and the problem with it, but it
+reverses ADR-013 and turns a security fix into a redesign of the saga. Giving
+booking an account and having it log in works, and costs a login, a cached token
+and its renewal.
+
+### Decision
+
+**An opaque token per calling service, held in configuration.** booking presents
+it in `X-Service-Token`; flight keeps a map of name to secret so a log can say
+which service called.
+
+**A header of its own, never `Authorization`.** A service secret must not be
+mistaken for a user's token nor end up wherever bearer tokens end up.
+
+**Compared in constant time.** `equals` stops at the first difference, and how
+long that took says how much of the secret was right.
+
+**The user's token still comes first.** The relay falls through to the secret
+only when there is no authentication at all, so a call with a person behind it
+never becomes an anonymous service call.
+
+**Only seat blocks accept it.** A secret that opens everything is how one that
+leaks becomes full access.
+
+**The value is never committed.** Configuration reads it from the environment
+with no default, so a service without it refuses to start rather than starting
+unprotected.
+
+### Consequences
+
+- **It is a shared secret, and the record should say so plainly.** Whoever can
+  read the configuration can impersonate the service. Rotating it is manual,
+  which a token with an expiry would not be.
+- **It does not expire.** A leak lasts until somebody notices.
+- **This is client credentials built from what was already here**, not a new
+  grant type. If this system ever needs real service identity, auth-service is
+  where it goes, and the header stays the same.
+- **`ServiceTokenSliceTest` is the only test that fails if any of it is
+  removed.** Every other test either carries a user's token or asks for
+  something public, and neither notices this path exists.
+
+---
+
+## ADR-024: One door in
+
+**Status:** Accepted
+
+### Context
+
+Neither story asks for a gateway. US-012 is answered by auth-service issuing and
+the services verifying; US-013 by the rules in each service and the ownership
+checks where the data is. The `README` describes five services and no gateway,
+so this is a departure from the brief, agreed with the instructor the way the
+orchestrated saga was (ADR-013).
+
+What it adds is worth naming precisely, because two of the three things people
+expect from a gateway are already done elsewhere.
+
+### Decision
+
+**A gateway on 8080, and nothing else published.** The services keep their
+security: this is a second lock, not the only one.
+
+**One module, not the three of ADR-006.** There is no domain here. Routes and
+rules, and a domain module with nothing in it would be ceremony.
+
+**The webmvc variant, not the reactive one.** Everything else in this system is
+servlet and blocking, and the reactive gateway would bring a second security
+model, `SecurityWebFilterChain` instead of `SecurityFilterChain`, for no gain.
+
+**Seat blocks are not routed at all.** `POST` and `DELETE` on
+`/api/v1/flights/*/seat-blocks/**` are refused here, logged in or not. That is
+the one thing this gateway does that nothing else could: holding and releasing
+seats is booking-service's business, and from outside the network it now does
+not exist. flight-service still checks the service token behind it (ADR-023).
+
+**Role rules stay where the data is.** A gateway can decide that a role may call
+a path; it cannot decide that a booking is yours. Today no endpoint here is
+staff-only, so a role rule at this layer would list all three roles and mean
+nothing. When one is needed, this is where it goes.
+
+### Consequences
+
+- **Everything moved to one port.** The smoke scripts and anyone reading the
+  README go through 8080.
+- **The end-to-end suite does not use it.** It builds its own stack and reaches
+  each service by its mapped port, which is what makes it reproducible and what
+  also made it blind to a missing broker address once before. The gateway is
+  exercised by the smoke scripts, and that gap is deliberate and recorded.
+- **A fifteenth container**, and one more thing that has to be up before
+  anything answers.
+- **Database and broker ports are still published**, for looking at while
+  developing. They are not web surface, and the scripts reach them with
+  `docker exec` rather than through them.

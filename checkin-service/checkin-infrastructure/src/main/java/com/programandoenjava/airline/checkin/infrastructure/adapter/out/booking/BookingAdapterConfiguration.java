@@ -8,6 +8,11 @@ import org.springframework.context.annotation.Configuration;
 public class BookingAdapterConfiguration {
 
     @Bean
+    BearerTokenRelay bearerTokenRelay() {
+        return new BearerTokenRelay();
+    }
+
+    @Bean
     ReadBookingPort readBookingPort(final BookingClient bookingClient) {
         return new ReadBookingFeignAdapter(bookingClient);
     }

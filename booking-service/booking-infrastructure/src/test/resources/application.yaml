@@ -1,4 +1,11 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Never fetched: no test here presents a real token, and the filter
+          # chain only needs the decoder bean to exist to be built.
+          jwk-set-uri: http://localhost:0/.well-known/jwks.json
   jpa:
     hibernate:
       ddl-auto: validate
@@ -15,6 +22,7 @@ spring:
       auto-offset-reset: earliest
 
 airline:
+  service-token: a-token-for-tests
   flight-service:
     url: http://localhost:0
 

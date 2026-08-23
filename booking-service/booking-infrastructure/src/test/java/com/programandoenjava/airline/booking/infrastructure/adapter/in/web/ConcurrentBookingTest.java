@@ -12,6 +12,7 @@ import com.programandoenjava.airline.booking.domain.booking.SeatBlockId;
 import com.programandoenjava.airline.booking.domain.shared.Money;
 import com.programandoenjava.airline.booking.infrastructure.adapter.out.persistence.booking.BookingPersistenceConfiguration;
 import com.programandoenjava.airline.booking.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.booking.infrastructure.security.SecurityConfiguration;
 import com.programandoenjava.airline.booking.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +30,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -55,7 +58,8 @@ import java.util.stream.IntStream;
         GlobalExceptionHandler.class,
         ApplicationConfiguration.class,
         BookingPersistenceConfiguration.class,
-        TransactionSupportConfiguration.class
+        TransactionSupportConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -95,6 +99,9 @@ class ConcurrentBookingTest {
 
     @MockitoBean
     private HoldSeatsPort holdSeatsPort;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @MockitoBean
     private ProcessedEventsPort processedEventsPort;
@@ -190,10 +197,11 @@ class ConcurrentBookingTest {
             throws Exception {
 
         String body = """
-                {"passengerId": "%s", "flightId": "%s", "seats": %d}
-                """.formatted(passengerId, flightId, SEATS_WANTED);
+                {"flightId": "%s", "seats": %d}
+                """.formatted(flightId, SEATS_WANTED);
 
         var response = mockMvc.perform(MockMvcRequestBuilders.post(BOOKINGS)
+                        .with(as(passengerId))
                         .header(IDEMPOTENCY_KEY, key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -213,6 +221,13 @@ class ConcurrentBookingTest {
         }
 
         return JsonPath.read(payload, "$.bookingId");
+    }
+
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor as(
+            final UUID passengerId) {
+
+        return SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(token -> token.subject(passengerId.toString()));
     }
 
     private void givenSeatsAreHeld() {

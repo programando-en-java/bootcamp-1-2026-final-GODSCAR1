@@ -15,6 +15,7 @@ import com.programandoenjava.airline.checkin.domain.boardingpass.PassengerId;
 import com.programandoenjava.airline.checkin.infrastructure.adapter.out.persistence.boardingpass.BoardingPassPersistenceConfiguration;
 import com.programandoenjava.airline.checkin.infrastructure.adapter.out.persistence.boardingsequence.BoardingSequenceConfiguration;
 import com.programandoenjava.airline.checkin.infrastructure.config.ApplicationConfiguration;
+import com.programandoenjava.airline.checkin.infrastructure.security.SecurityConfiguration;
 import com.programandoenjava.airline.checkin.infrastructure.transaction.TransactionSupportConfiguration;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
@@ -34,6 +35,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,7 +56,8 @@ import java.util.UUID;
         ApplicationConfiguration.class,
         BoardingPassPersistenceConfiguration.class,
         BoardingSequenceConfiguration.class,
-        TransactionSupportConfiguration.class
+        TransactionSupportConfiguration.class,
+        SecurityConfiguration.class
 })
 @EnableDatabaseTest
 @Import(TestcontainersConfiguration.class)
@@ -82,6 +86,8 @@ class CheckInSliceTest {
     private static final String ORIGIN = "BOG";
     private static final String DESTINATION = "MDE";
 
+    private static final UUID PASSENGER = UUID.randomUUID();
+
     private static final String CONFIRMED = "CONFIRMED";
     private static final String PENDING = "PENDING";
     private static final String FAILED = "FAILED";
@@ -93,6 +99,9 @@ class CheckInSliceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @MockitoBean
     private ReadBookingPort readBookingPort;
@@ -253,6 +262,32 @@ class CheckInSliceTest {
     }
 
     @Nested
+    @DisplayName("when the booking is somebody else's")
+    class NotYours {
+
+        @Test
+        @DisplayName("should answer as if the booking did not exist")
+        void shouldAnswerAsIfTheBookingDidNotExist() throws Exception {
+            UUID booking = UUID.randomUUID();
+            givenBookingIsConfirmed(booking, aFlight(), SOON);
+
+            mockMvc.perform(checkIn(booking).with(as(UUID.randomUUID())))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("should print nothing for them")
+        void shouldPrintNothingForThem() throws Exception {
+            UUID booking = UUID.randomUUID();
+            givenBookingIsConfirmed(booking, aFlight(), SOON);
+
+            mockMvc.perform(checkIn(booking).with(as(UUID.randomUUID())));
+
+            Assertions.assertThat(passCount()).isZero();
+        }
+    }
+
+    @Nested
     @DisplayName("when the booking is not one to board with")
     class NotBoardable {
 
@@ -384,10 +419,22 @@ class CheckInSliceTest {
         @DisplayName("should reject a request that names no booking")
         void shouldRejectARequestThatNamesNoBooking() throws Exception {
             mockMvc.perform(MockMvcRequestBuilders.post(BOARDING_PASSES)
+                            .with(anyCaller())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest());
         }
+    }
+
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor anyCaller() {
+        return as(PASSENGER);
+    }
+
+    private static SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor as(
+            final UUID passengerId) {
+
+        return SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(token -> token.subject(passengerId.toString()));
     }
 
     private MockHttpServletRequestBuilder checkIn(final UUID bookingId) {
@@ -396,6 +443,7 @@ class CheckInSliceTest {
                 """.formatted(bookingId);
 
         return MockMvcRequestBuilders.post(BOARDING_PASSES)
+                .with(anyCaller())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body);
     }
@@ -412,7 +460,7 @@ class CheckInSliceTest {
                                 final Instant departure) {
         BookingId booking = new BookingId(bookingId);
         FlightId flight = new FlightId(flightId);
-        PassengerId passenger = new PassengerId(UUID.randomUUID());
+        PassengerId passenger = new PassengerId(PASSENGER);
 
         BookingToCheckIn answer = new BookingToCheckIn(booking, passenger, flight, status);
         BDDMockito.given(readBookingPort.byId(booking)).willReturn(answer);
