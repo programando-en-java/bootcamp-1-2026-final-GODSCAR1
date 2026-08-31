@@ -1,203 +1,138 @@
-# Sistema de Reservas en una Aerolinea - Proyecto con Microservicios
+# Sistema de reservas de aerolínea
 
-## Descripción General
+Proyecto final del bootcamp **De Senior a Arquitecto - Programando En Java**. Un sistema de reservas construido como siete servicios independientes: buscar un vuelo, reservarlo, pagarlo, facturar y enterarse de todo ello.
 
-Este proyecto es un **sistema de reservas de aerolínea como parte del proyecto final del proyecto final del Bootcamp de Senior a Arquitecto - Programando En Java**, desarrollado con **Java + Spring Boot**.
+No es una maqueta. Los servicios se comunican por Kafka con outbox transaccional, la reserva y el pago se coordinan con una saga que compensa cuando la tarjeta se rechaza, cada petición viaja con un JWT firmado con RS256, y hay 448 pruebas automáticas más 35 de extremo a extremo contra la pila real levantada con Testcontainers.
 
-El objetivo es simular cómo se construyen sistemas backend modernos en empresas:
-
-* Arquitectura de microservicios
-* Comunicación basada en eventos
-* Procesamiento de pagos desacoplado (Strategy Pattern)
-* Transacciones distribuidas (Saga Pattern)
-* Seguridad con JWT y control de roles
-
-> ⚠️ Este proyecto es **100% práctico**. Aquí no hay teoría innecesaria: construyes un sistema real de principio a fin.
+**Las decisiones están en [`ARCHITECTURE.md`](ARCHITECTURE.md): 24 ADR con su índice al principio.** Este README dice qué hay y cómo ejecutarlo; el porqué de cada cosa está allí.
 
 ---
 
-## Alcance del MVP (2 semanas)
+## Servicios
 
-El proyecto está diseñado para enfocarse en **4 flujos principales**:
+| Servicio               | Responsabilidad                                 | Puerto | Base                   |
+| ---------------------- | ----------------------------------------------- | ------ | ---------------------- |
+| `api-gateway`          | Única puerta de entrada, enruta y filtra         | 8080   | ninguna                |
+| `flight-service`       | Vuelos, inventario y bloqueo de asientos         | 8081   | `airline_flight`       |
+| `booking-service`      | Reservas y su ciclo de vida                      | 8082   | `airline_booking`      |
+| `payment-service`      | Cobros y pasarela simulada                       | 8083   | `airline_payment`      |
+| `checkin-service`      | Facturación y tarjeta de embarque                | 8084   | `airline_checkin`      |
+| `notification-service` | Avisa al pasajero; solo consume, no expone HTTP  | 8085   | `airline_notification` |
+| `auth-service`         | Usuarios, roles y emisión de tokens              | 8086   | `airline_auth`         |
 
-### Incluido
-
-* 🔍 Búsqueda de vuelos
-* 🧾 Reserva de vuelos
-* 💳 Procesamiento de pagos
-* 🛫 Check-in online
-
-### Fuera de alcance
-
-* Programas de fidelización
-* Gestión de equipaje
-* Analítica avanzada
-* Arquitecturas avanzadas (DDD / Hexagonal)
+Cada servicio tiene su propia base de datos y nadie lee la del vecino. Los puertos 8081 a 8086 **no están publicados**: desde fuera solo existe el 8080.
 
 ---
 
-## Arquitectura
+## Ejecutar el sistema
 
-El sistema está basado en **microservicios independientes**, donde cada servicio tiene su propia responsabilidad.
+```bash
+docker compose up -d --build --wait
+```
 
-### Servicios
+Levanta catorce contenedores: seis bases PostgreSQL, Kafka y los siete servicios. Las imágenes se construyen desde el código en dos etapas, así que no hace falta compilar antes.
 
-| Servicio             | Responsabilidad                   |
-| -------------------- | --------------------------------- |
-| Flight Service       | Gestión de vuelos e inventario    |
-| Booking Service      | Gestión de reservas               |
-| Payment Service      | Procesamiento de pagos            |
-| Check-in Service     | Check-in y tarjeta de embarque    |
-| Notification Service | Notificaciones basadas en eventos |
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"passenger@airline.test","password":"passenger123"}'
+```
 
----
+Las tres cuentas de demostración, una por rol, están en [`scripts/README.md`](scripts/README.md) junto con los guiones que recorren el sistema entero y muestran lo que ocurre en cada paso.
 
-## Flujo Principal
-
-```text id="m2a9fd"
-Buscar vuelo → Reservar → Pagar → Check-in → Notificar
+```bash
+docker compose down -v
 ```
 
 ---
 
-## Stack Tecnológico
+## Ejecutar las pruebas
 
-* Java 17+
-* Spring Boot
-* Spring Data JPA
-* Spring Security (JWT)
-* H2 (desarrollo) / PostgreSQL (producción)
-* Docker & Docker Compose
-* GitHub Actions (CI/CD)
+```bash
+./mvnw -B clean verify                                # 448 pruebas
+./mvnw -B verify -pl e2e-tests -Dairline.e2e=true     # 35 más, con la pila real
+```
+
+Las de extremo a extremo van detrás de un flag porque levantan catorce contenedores y tardan varios minutos; el resto se ejecuta en cada cambio.
+
+**No hay pruebas unitarias con mocks de la capa de persistencia.** El estilo está en [ADR-010](ARCHITECTURE.md#adr-010-testing-style): contextos de Spring construidos a mano contra PostgreSQL real en Testcontainers, `@Nested` con nombres que se leen como frases, y DAMP antes que DRY. Las clases de dominio puras son la única excepción.
 
 ---
 
-## 📁 Estructura del Proyecto
+## Por dónde entrar a los ADR
 
-```text id="cd3nqp"
-airline-system/
-├── flight-service/
-├── booking-service/
-├── payment-service/
-├── checkin-service/
-├── notification-service/
-└── docker-compose.yml
-```
+Los 24 están indexados al principio de [`ARCHITECTURE.md`](ARCHITECTURE.md). Si vas a leer solo unos pocos:
 
----
+**Cómo está montado.** [ADR-006](ARCHITECTURE.md#adr-006-hexagonal-architecture-with-one-maven-module-per-layer) explica por qué cada servicio son tres módulos Maven cuando el enunciado decía expresamente que no hacía falta, y [ADR-003](ARCHITECTURE.md#adr-003-no-shared-module) por qué no hay un módulo compartido y los contratos se duplican a propósito.
 
-## Cómo ejecutar el proyecto
+**Cómo se hablan los servicios.** [ADR-001](ARCHITECTURE.md#adr-001-transactional-outbox-for-integration-events) es el outbox transaccional: el evento y la fila que lo provoca se confirman juntos o no se confirma ninguno. [ADR-004](ARCHITECTURE.md#adr-004-synchronous-commands-for-contended-resources-kafka-for-facts) explica por qué bloquear asientos es una llamada síncrona y todo lo demás es un hecho publicado.
 
-### 1. Clonar repositorio
+**La saga.** [ADR-013](ARCHITECTURE.md#adr-013-the-payment-saga) es la orquestada que confirma la reserva cuando el pago sale y devuelve los asientos cuando no. [ADR-007](ARCHITECTURE.md#adr-007-pessimistic-locking-for-seat-inventory) es el bloqueo pesimista que impide vender el mismo asiento dos veces.
 
-```bash id="t5rw0j"
-git clone <tu-repositorio>
-cd airline-system
-```
+**Concurrencia.** [ADR-019](ARCHITECTURE.md#adr-019-deciding-a-write-by-reading-first) es el más útil si vienes a aprender algo: por qué las escrituras idempotentes son `SERIALIZABLE` con reintento, y por qué `flight-service` deliberadamente **no** lo es. La diferencia se midió con un test que pasó de responder `[201, 409]` a devolver cinco errores 500.
 
-### 2. Ejecutar con Docker
+**Seguridad.** Del [ADR-020](ARCHITECTURE.md#adr-020-who-issues-tokens-and-what-signs-them) al [ADR-024](ARCHITECTURE.md#adr-024-one-door-in): quién firma, por qué el pasajero sale del token y no del cuerpo de la petición, por qué una reserva ajena se responde como inexistente en vez de con un 403, y qué aporta el gateway de verdad, que es menos de lo que suele acreditársele.
 
-```bash id="h8k4pd"
-docker-compose up --build
-```
-
-### 3. Ejecutar en local (perfil dev)
-
-```bash id="f7n0sa"
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
-```
+Varios registran **errores, no aciertos**. [ADR-001](ARCHITECTURE.md#adr-001-transactional-outbox-for-integration-events) está enmendado porque afirmaba que `booking-service` nunca necesitaría un outbox, y resultó falso. [ADR-022](ARCHITECTURE.md#adr-022-a-booking-that-is-not-yours-does-not-exist) existe porque al añadir la comprobación de pertenencia apareció una forma de leer la tarjeta de embarque de otro pasajero. Está hecho a propósito: un registro que solo guarda las decisiones que salieron bien no sirve de mucho.
 
 ---
 
-## Autenticación
+## API
 
-El sistema usa **JWT (JSON Web Tokens)** para autenticación stateless.
+Todo pasa por `http://localhost:8080`.
+
+| Método   | Ruta                       | Quién                |
+| -------- | -------------------------- | -------------------- |
+| `POST`   | `/api/v1/auth/login`       | público              |
+| `GET`    | `/api/v1/flights`          | público              |
+| `GET`    | `/api/v1/flights/{id}`     | público              |
+| `POST`   | `/api/v1/bookings`         | autenticado          |
+| `GET`    | `/api/v1/bookings/{id}`    | su dueño, o personal |
+| `POST`   | `/api/v1/payments`         | autenticado          |
+| `POST`   | `/api/v1/boarding-passes`  | su dueño, o personal |
+
+Buscar vuelos es público porque nadie inicia sesión para mirar qué hay a la venta. Los bloqueos de asiento **no se enrutan**: los usa `booking-service` desde dentro de la red y no son alcanzables desde fuera ni con rol de administrador.
 
 ### Roles
 
-* `PASSENGER` → puede reservar y hacer check-in de sus vuelos
-* `AGENT` → puede gestionar reservas
-* `ADMIN` → acceso completo
+`PASSENGER` reserva y factura lo suyo, `AGENT` gestiona reservas ajenas, `ADMIN` accede a todo. La pertenencia no la decide el gateway sino el servicio dueño de los datos, que es el único que puede.
 
 ---
 
-## Testing
+## Eventos
 
-* Tests unitarios (TDD)
-* Tests de integración (MockMvc)
-* Cobertura mínima recomendada: **70%**
+| Topic                  | Lo publica      | Lo consume                            |
+| ---------------------- | --------------- | ------------------------------------- |
+| `booking.created.v1`   | booking-service | notification-service                  |
+| `payment.succeeded.v1` | payment-service | booking-service, notification-service |
+| `payment.failed.v1`    | payment-service | booking-service                       |
+| `checkin.completed.v1` | checkin-service | notification-service                  |
 
-Ejecutar tests:
+Todos salen de una tabla `outbox` con un relay que usa `FOR UPDATE SKIP LOCKED`, y todos los consumidores reclaman el identificador del evento antes de actuar, porque la entrega es al menos una vez.
 
-```bash id="m2pr9k"
-mvn test
+---
+
+## Stack
+
+Java 21, Spring Boot 4.1, Spring Cloud Gateway (variante webmvc), Spring Security 7, PostgreSQL 17, Kafka 4.1 en KRaft, Hibernate 7.2, Flyway, Maven multimódulo, Docker Compose, Testcontainers y GitHub Actions.
+
+Sin H2 en ninguna parte, ni siquiera en pruebas. El motivo está en [ADR-002](ARCHITECTURE.md#adr-002-postgresql-in-every-environment).
+
+---
+
+## Estructura
+
+```text
+airline-system/
+├── api-gateway/               un solo módulo: no tiene dominio
+├── flight-service/            domain / application / infrastructure
+├── booking-service/           idem
+├── payment-service/           idem
+├── checkin-service/           idem
+├── notification-service/      idem
+├── auth-service/              idem
+├── e2e-tests/                 recorridos completos con Testcontainers
+├── scripts/                   guiones de humo contra la pila levantada
+├── ARCHITECTURE.md            los 24 ADR
+└── docker-compose.yml
 ```
-
----
-
-## Arquitectura basada en eventos
-
-El sistema usa **Kafka** para desacoplar servicios. Cada publicador escribe el
-mensaje en su propia tabla `outbox`, dentro de la transacción que causó el
-hecho, y un relay lo lleva al topic (ADR-001).
-
-### Eventos principales
-
-* `booking.created.v1`
-* `payment.succeeded.v1` y `payment.failed.v1`
-* `checkin.completed.v1`
-
----
-
-## Transacciones distribuidas (Saga Pattern)
-
-El flujo de reserva sigue el patrón Saga:
-
-```text id="6z7g2p"
-Crear reserva
-   ↓
-Bloquear asientos
-   ↓
-Procesar pago
-   ↓
-Confirmar reserva
-```
-
-Si el pago falla:
-
-```text id="6a2qwv"
-Liberar asientos (acción compensatoria)
-```
-
----
-
-## Flujo de trabajo (GitHub)
-
-Se utiliza:
-
-* **Issues** → User Stories
-* **Epics** → funcionalidades grandes
-* **GitHub Projects** → tablero Kanban
-
----
-
-## Definition of Done
-
-Una funcionalidad se considera terminada cuando:
-
-* El código compila
-* Los tests pasan
-* Se cumplen los criterios de aceptación
-* No hay estados inconsistentes
-* Ha sido revisada
-
----
-
-## Objetivo Final
-
-Al completar este proyecto serás capaz de:
-
-* Entender cómo se construyen sistemas backend reales
-* Trabajar con microservicios y eventos
-* Implementar patrones de arquitectura usados en producción
-* Tener un proyecto sólido para tu portfolio
